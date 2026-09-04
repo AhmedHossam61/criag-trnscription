@@ -640,7 +640,7 @@ class QwenCleoBackend(Backend):
 
     def load(self) -> None:
         from qwencleo_asr import QwenCleoASR
-        self.asr = QwenCleoASR()
+        self.asr = QwenCleoASR()  # wrapper loads in bfloat16 on its own
 
     def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
         results = self.asr.transcribe(
@@ -959,9 +959,17 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
          ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path]]:
     tracks = discover_tracks(root)
     if speaker_map:
+        import fnmatch
         kept: list[Track] = []
         for t in tracks:
-            renamed = speaker_map.get(t.speaker.lower())
+            uname = t.speaker.lower()
+            # Try exact match first, then fnmatch patterns (jockie*, megadon*).
+            renamed = speaker_map.get(uname)
+            if renamed is None:
+                for pat, target in speaker_map.items():
+                    if any(ch in pat for ch in "*?[") and fnmatch.fnmatchcase(uname, pat):
+                        renamed = target
+                        break
             if renamed is None:
                 kept.append(t)
                 continue

@@ -17,4 +17,13 @@ abdoo_        = Arnok
 hazemonsif    = Thalion
 
 # Bots / non-speech tracks
-megadoon      = SKIP
+# Craig appends a numeric discriminator to Discord usernames
+# (megadoon -> megadon7338), so use glob patterns for anything
+# whose suffix might change between recordings.
+megadon*      = SKIP
+megadoon*     = SKIP
+jockie*       = SKIP
+jockie_music* = SKIP
+# bodaa: 0 min of speech in the sample -- probably a player who didn't talk.
+# Not skipping (costs zero GPU time either way). Add a real-name mapping
+# once you know who they are, e.g.:  bodaa* = Some Character
