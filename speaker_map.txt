@@ -1,0 +1,20 @@
+# Discord username = display name
+# Case-insensitive on the left. Blank lines and '#' comments are ignored.
+# Craig names files "<index>-<discord_username>.flac" -- the left side is
+# that <discord_username> exactly (without the leading index and dash).
+# If a run prints an unmapped speaker, add a line here and re-run.
+#
+# Set the right side to SKIP (or - / IGNORE) to drop that track entirely.
+# Use this for music bots and anyone whose audio you don't want transcribed.
+
+ahmed hossam  = Kael
+ahmedhoss61   = Kael
+seifeldien    = Vaylor
+geniusgamerm  = Dungeon Master
+noob          = Arnok
+arnok         = Arnok
+abdoo_        = Arnok  
+hazemonsif    = Thalion
+
+# Bots / non-speech tracks
+megadoon      = SKIP

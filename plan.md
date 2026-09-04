@@ -7,9 +7,30 @@ in `craig_transcribe.py`.
 
 ## Goal
 
-Take a Craig Bot recording of a Discord voice call (Egyptian Arabic, with
-English mixed in) and produce a speaker-labelled transcript. Recordings are
-typically **8 hours** long. Everything runs locally.
+Take a Craig Bot recording of a **Dungeons & Dragons session** on Discord
+(Egyptian Arabic table talk, with heavy English game jargon mixed in) and
+produce a speaker-labelled transcript. Sessions run **4–8 hours** with one DM
+and typically 3–6 players. Everything runs locally.
+
+### What makes D&D audio different
+
+- **Dense English jargon inside Arabic sentences**: spell names, stat blocks,
+  rules terms (`Fireball`, `saving throw`, `DC 15`, `AC`, `HP`, `initiative`,
+  `advantage`, `disadvantage`, `crit`). This is exactly the code-switching
+  pattern QwenCleo was fine-tuned on — see below.
+- **Proper nouns the model has never seen**: character names, place names,
+  homebrew items. Without a hotword glossary these get mangled into
+  near-homophones or transliterated inconsistently across the transcript.
+- **DM voices multiple NPCs**: the DM's single Craig track will contain
+  different accents/registers as they act. Diarization is still correct (one
+  track = one *person*, not one character), but the transcript won't
+  distinguish NPC lines from DM narration. Handle that in post, not here.
+- **High-overlap reactions**: laughter, "nat 20!", groans, and cross-talk on
+  dice results are constant. Per-speaker tracks make this a non-issue for
+  segmentation, but see `MIN_SPEECH_S` note below — short reactions are where
+  hallucination is worst.
+- **In-character vs out-of-character** speech is interleaved with no acoustic
+  marker. Not solvable at the ASR layer; flagged as a post-processing task.
 
 ## Environment
 
@@ -91,7 +112,7 @@ Craig .zip
 |---|---|---|
 | `MIN_GAP_S` | 0.45 | Shorter zero-runs are packet jitter mid-sentence. Splitting there cuts words in half. |
 | `MAX_CHUNK_S` | 28.0 | Whisper's encoder is hard-capped at 30s. Qwen/Cohere take more but degrade. |
-| `MIN_SPEECH_S` | 0.35 | Below this it's a cough or mic bump, and models hallucinate sentences out of it. |
+| `MIN_SPEECH_S` | 0.35 | Below this it's a cough or mic bump, and models hallucinate sentences out of it. **D&D tradeoff:** this also drops short reactions like "nat 20", "شايف؟", "kill him". If the dropped-fragments report shows too many discarded voiced runs, lower to 0.25 and rely harder on the hallucination filter. |
 | `PAD_S` | 0.20 | Keeps plosives from being clipped at boundaries. |
 
 ---
@@ -145,6 +166,58 @@ to be only scattered words. `label_script()` classifies output by actual
 characters produced, independent of the requested tag — so if `auto` misfires
 and starts transliterating, the `en`/`mixed` share in the final report
 collapses toward zero. That's the signal to switch to `ar`.
+
+**D&D default: start with `--language ar`.** Sessions are Arabic-matrix with
+embedded English terms, not English sentences between Arabic ones. `auto` only
+pays off if a player consistently speaks whole English sentences (e.g. the DM
+narrating rules in English). Confirm by looking at the script mix in the
+first `--limit 300` benchmark.
+
+---
+
+## Hotwords / glossary — mandatory for D&D
+
+The `--hotwords FILE` flag ships plain text to the backend as an initial
+prompt (whisper) or biasing glossary (qwen3asr). It is currently the only
+lever we have for making the model *aware* that "Faerûn" or "Tasha's Cauldron"
+is a real string. Without it these will decode to random near-homophones and
+break search/summarisation later.
+
+Build one `hotwords.txt` per campaign, one term per line, mixing Arabic and
+Latin script exactly as you want them to appear in the transcript:
+
+```
+# Party
+كايلاس
+Thornbeard
+Seraphina
+
+# Setting
+Waterdeep
+Faerûn
+Baldur's Gate
+
+# Rules / mechanics
+Fireball
+Eldritch Blast
+saving throw
+advantage
+disadvantage
+initiative
+nat 20
+DC
+AC
+HP
+```
+
+Notes:
+- Only `qwen3asr` truly biases decoding on hotwords. `qwencleo` and
+  `faster-whisper` treat them as a prompt (softer effect). `cohere` ignores
+  them entirely — the code prints a `note:` when that happens.
+- Keep the list under ~200 tokens for whisper; longer prompts crowd out real
+  context. For `qwen3asr` the practical limit is higher but still finite.
+- Names *only* — don't dump the entire Player's Handbook. Bias is a scarce
+  resource, spend it on things the model would otherwise get wrong.
 
 ---
 
@@ -205,9 +278,22 @@ several hours (autoregressive), faster-whisper in between. Benchmark with
 2. **Which backend actually wins** on this audio. Unresolved until benchmarked.
 3. **Overlap handling in output.** Segments are currently sorted by start time,
    so an interruption appears as two adjacent turns. Fine for reading, possibly
-   wrong for downstream summarisation.
-4. **Post-processing.** An LLM pass to clean up the merged transcript
-   (punctuation, speaker attribution near overlaps) is unexplored.
+   wrong for downstream summarisation. D&D sessions have overlap on almost
+   every dice roll — worth revisiting if the merged transcript reads poorly.
+4. **Post-processing for D&D.** An LLM pass could do several things worth more
+   than transcript-level tuning:
+   - Split in-character vs out-of-character lines (heuristics: rules jargon
+     and meta-talk = OOC; NPC dialogue and description = IC when from DM).
+   - Attribute NPC lines on the DM track to named NPCs using surrounding
+     context.
+   - Normalise spellings of proper nouns against the hotword list.
+   - Summarise per-scene or per-session-recap. This is the highest-leverage
+     downstream step and is unexplored.
+5. **Open-mic DMs.** DMs are the most likely offenders for always-transmit
+   (they talk almost continuously). If the DM's `--dry-run` speech ratio is
+   >90%, the zero-run VAD is effectively bypassed on that track and every
+   chunk hits `MAX_CHUNK_S`. Silero-VAD fallback becomes necessary, not
+   optional, before running the full session.
 
 ---
 

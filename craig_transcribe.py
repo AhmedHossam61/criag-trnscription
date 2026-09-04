@@ -940,8 +940,37 @@ def load_done(jsonl: Path) -> dict[str, Segment]:
 # Driver
 # ---------------------------------------------------------------------------
 
-def plan(root: Path, scratch: Path, limit_s: float | None) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path]]:
+def load_speaker_map(path: Path) -> dict[str, str]:
+    """Parse a 'discord_username = display name' file. Case-insensitive keys."""
+    mapping: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip().lower(), value.strip()
+        if key and value:
+            mapping[key] = value
+    return mapping
+
+
+def plan(root: Path, scratch: Path, limit_s: float | None,
+         speaker_map: dict[str, str] | None = None,
+         ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path]]:
     tracks = discover_tracks(root)
+    if speaker_map:
+        kept: list[Track] = []
+        for t in tracks:
+            renamed = speaker_map.get(t.speaker.lower())
+            if renamed is None:
+                kept.append(t)
+                continue
+            if renamed.upper() in {"SKIP", "-", "IGNORE"}:
+                print(f"  skipping track {t.index} ({t.speaker}) per speaker map")
+                continue
+            t.speaker = renamed
+            kept.append(t)
+        tracks = kept
     pcm_paths: dict[int, Path] = {}
     plans: dict[int, list[Chunk]] = {}
 
@@ -997,6 +1026,14 @@ def main() -> None:
         "--hotwords", type=Path, default=None, metavar="FILE",
         help="text file of domain vocabulary to bias decoding (qwen3asr, faster-whisper)",
     )
+    parser.add_argument(
+        "--speaker-map", type=Path, default=None, metavar="FILE",
+        help=(
+            "text file mapping Discord usernames to display names, one "
+            "'username = display name' per line. Blank lines and '#' comments "
+            "are ignored. Match is case-insensitive on the Discord username."
+        ),
+    )
     parser.add_argument("--batch-size", type=int, default=None, help="override the backend default")
     parser.add_argument(
         "--limit", type=float, default=None, metavar="SECONDS",
@@ -1040,9 +1077,13 @@ def main() -> None:
             for key, value in info.items():
                 print(f"  {key}: {value}")
 
+        speaker_map = load_speaker_map(args.speaker_map) if args.speaker_map else None
+        if speaker_map:
+            print(f"\nSpeaker map: {len(speaker_map)} rename(s) loaded from {args.speaker_map}")
+
         print("\nSegmenting tracks (zero-run VAD):")
         t0 = time.time()
-        tracks, plans, pcm_paths = plan(root, scratch, args.limit)
+        tracks, plans, pcm_paths = plan(root, scratch, args.limit, speaker_map=speaker_map)
         total_chunks = sum(len(c) for c in plans.values())
         total_speech = sum(c.duration_s for cs in plans.values() for c in cs)
         print(

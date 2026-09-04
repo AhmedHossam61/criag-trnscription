@@ -132,6 +132,8 @@ REM retired cu121 index. --no-deps means the pin is not enforced anyway.
 echo ^>^> installing torch ^(%CUDA%^)
 pip install torch torchaudio --index-url "%TORCH_INDEX%"
 if errorlevel 1 goto :failed_torch
+call :verify_cuda
+if errorlevel 1 goto :failed_cuda
 echo ^>^> installing qwencleo-asr ^(--no-deps^)
 pip install qwencleo-asr --no-deps
 if errorlevel 1 goto :failed
@@ -144,6 +146,8 @@ goto :verify
 echo ^>^> installing torch ^(%CUDA%^)
 pip install torch torchaudio --index-url "%TORCH_INDEX%"
 if errorlevel 1 goto :failed_torch
+call :verify_cuda
+if errorlevel 1 goto :failed_cuda
 pip install -r requirements-qwen3asr.txt
 if errorlevel 1 goto :failed
 goto :verify
@@ -152,6 +156,8 @@ goto :verify
 echo ^>^> installing torch ^(%CUDA%^)
 pip install torch torchaudio --index-url "%TORCH_INDEX%"
 if errorlevel 1 goto :failed_torch
+call :verify_cuda
+if errorlevel 1 goto :failed_cuda
 pip install -r requirements-cohere.txt
 if errorlevel 1 goto :failed
 echo.
@@ -175,6 +181,32 @@ echo.
 echo Done. Activate with:  %VENV%\Scripts\activate.bat
 echo Then:                 python craig_transcribe.py recording.zip -o out --backend %BACKEND%
 exit /b 0
+
+:verify_cuda
+REM Hard-fail if pip installed a CPU-only wheel or the driver can't reach the GPU.
+python -c "import torch, sys; ok = torch.cuda.is_available(); print(f'  torch {torch.__version__} | CUDA build: {torch.version.cuda} | cuda.is_available: {ok}'); sys.exit(0 if ok else 1)"
+exit /b %errorlevel%
+
+:failed_cuda
+echo.
+echo ERROR: torch installed but torch.cuda.is_available^(^) is False.
+echo        The transcriber would fall back to CPU and be unusably slow.
+echo.
+echo Fix, in order of likelihood:
+echo   1. NVIDIA driver missing or too old. Run:  nvidia-smi
+echo      A driver supporting CUDA 12.x is required. Update via GeForce
+echo      Experience or https://www.nvidia.com/Download/index.aspx
+echo.
+echo   2. pip resolved a CPU-only wheel ^(happens if the CUDA index was
+echo      unreachable^). Rebuild the venv with a fresh index:
+echo          deactivate
+echo          rmdir /s /q %VENV%
+echo          set CUDA=cu128 ^&^& setup.cmd %BACKEND%
+echo.
+echo   3. Confirm the installed build is a CUDA wheel:
+echo          python -c "import torch; print(torch.version.cuda)"
+echo      Should print a version like 12.6, NOT None.
+exit /b 1
 
 :failed_torch
 echo.

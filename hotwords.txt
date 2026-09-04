@@ -1,0 +1,145 @@
+# D&D 5.5e (2024) hotwords for QwenCleo / Qwen3-ASR / faster-whisper.
+# One term per line. Blank lines and '#' comments are ignored by the model
+# (they are just here for you). Keep the total list short -- long prompts
+# crowd out real context. Names the model would otherwise mis-spell are what
+# belong here; do not dump the entire rulebook.
+
+# --- Party (player characters) ---
+Kael
+Vaylor
+Arnok
+Thalion
+Dungeon Master
+DM
+
+# --- NPCs (add one per line as they appear in play) ---
+# e.g.:
+# Elara the innkeeper
+# Captain Roric
+
+# --- Places / setting ---
+# e.g.:
+# Waterdeep
+# Neverwinter
+# Faerûn
+# Baldur's Gate
+
+# --- 5.5e / 2024 rules terms ---
+initiative
+advantage
+disadvantage
+saving throw
+skill check
+ability check
+death saving throw
+concentration
+bonus action
+reaction
+opportunity attack
+critical hit
+critical miss
+nat 20
+nat 1
+DC
+AC
+HP
+XP
+d4
+d6
+d8
+d10
+d12
+d20
+d100
+hit dice
+proficiency bonus
+inspiration
+heroic inspiration
+exhaustion
+long rest
+short rest
+
+# --- Classes (2024 PHB) ---
+Barbarian
+Bard
+Cleric
+Druid
+Fighter
+Monk
+Paladin
+Ranger
+Rogue
+Sorcerer
+Warlock
+Wizard
+Artificer
+
+# --- Species (2024 PHB) ---
+Aasimar
+Dragonborn
+Dwarf
+Elf
+Gnome
+Goliath
+Halfling
+Human
+Orc
+Tiefling
+
+# --- Common spells / cantrips ---
+Fireball
+Eldritch Blast
+Magic Missile
+Cure Wounds
+Healing Word
+Guidance
+Mage Hand
+Prestidigitation
+Sacred Flame
+Shield
+Counterspell
+Hold Person
+Misty Step
+Bless
+Bane
+Hex
+Hunter's Mark
+Detect Magic
+Dispel Magic
+Fly
+Invisibility
+Sleep
+Thunderwave
+Vicious Mockery
+
+# --- Common creatures ---
+Goblin
+Hobgoblin
+Orc
+Kobold
+Bugbear
+Gnoll
+Troll
+Ogre
+Owlbear
+Beholder
+Mind Flayer
+Dragon
+Lich
+Vampire
+
+# --- Common items / gear ---
+longsword
+shortsword
+greatsword
+warhammer
+crossbow
+shortbow
+longbow
+rapier
+scimitar
+shield
+plate armor
+chain mail
+studded leather
+potion of healing
