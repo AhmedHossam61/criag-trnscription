@@ -1,0 +1,16 @@
+# Backend: qwen3asr  --  Qwen/Qwen3-ASR-1.7B-hf
+#
+# QwenCleo's base model. Native language ID, so --language auto is reliable
+# here, and the only backend that accepts --hotwords as a real context prompt.
+#
+# Install torch first from a CUDA index that still exists, e.g.:
+#     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+# (cu121 was retired; current indexes are cu126, cu128, cu129, cu130)
+
+transformers>=5.13.0
+torch
+torchaudio
+accelerate
+soundfile
+librosa
+numpy>=1.24

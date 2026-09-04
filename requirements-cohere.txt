@@ -1,0 +1,21 @@
+# Backend: cohere  --  CohereLabs/cohere-transcribe-arabic-07-2026
+#
+# Fastest option, best MSA/dialect WER, but its model card states it has no
+# automatic language detection and is inconsistent on code-switched audio.
+# Prefer qwencleo if English shows up often in your recordings.
+#
+# GATED WEIGHTS: accept the terms at
+#   https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026
+# then authenticate:
+#   hf auth login
+#
+# transformers 5.0 and 5.1 have a weight-loading bug; >=5.4.0 avoids them.
+
+transformers>=5.4.0
+torch
+accelerate
+soundfile
+librosa
+sentencepiece
+protobuf
+numpy>=1.24

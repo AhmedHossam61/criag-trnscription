@@ -1,0 +1,35 @@
+# Backend: qwencleo  --  mohammedaly22/QwenCleo-ASR (recommended)
+#
+# DO NOT `pip install -r` this on its own. QwenCleo must be installed with
+# --no-deps after torch, which a requirements file cannot express. Use:
+#
+#     setup.cmd qwencleo
+#
+# ...or run these three steps by hand, in this order:
+#
+#   1) torch, from a CUDA index that still exists. cu121 was RETIRED -- the
+#      current indexes are cu126, cu128, cu129, cu130. Check your driver with
+#      nvidia-smi; any driver supporting CUDA 12.x works with a cu12x build.
+#
+#      pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
+#
+#      QwenCleo's README suggests torch==2.5.1, but that version has no wheels
+#      for Python 3.13 and none at all on the retired cu121 index. Since step 2
+#      uses --no-deps, the pin is not enforced anyway -- let pip pick a build
+#      that matches your interpreter.
+#
+#      Python 3.12 is the safest interpreter here: it is what QwenCleo's own
+#      README uses, and torch only gained 3.13 support in 2.6.
+#
+#   2) QwenCleo WITHOUT letting it re-resolve torch:
+#
+#      pip install qwencleo-asr --no-deps
+#
+#   3) its remaining runtime deps (listed below):
+#
+#      pip install -r requirements-qwencleo.txt
+
+qwen-asr>=0.0.6
+numpy>=1.24
+soundfile
+huggingface_hub

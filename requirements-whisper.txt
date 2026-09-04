@@ -1,0 +1,11 @@
+# Backend: faster-whisper  --  baseline comparison only.
+#
+# Whisper large-v3 flattens Egyptian dialect into MSA and tends to
+# transliterate English into Arabic script rather than keeping it in Latin.
+# Useful to quantify how much the Arabic-specific models buy you.
+#
+# faster-whisper uses CTranslate2, NOT torch, so this backend installs
+# cleanly alongside nothing else. Run it in its own venv for a clean A/B.
+
+faster-whisper>=1.0.0
+numpy>=1.24
