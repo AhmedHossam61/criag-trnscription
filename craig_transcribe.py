@@ -498,6 +498,11 @@ HALLUCINATION_PATTERNS = [
     r"subtitles?\s+by",
     r"amara\.org",
     r"thanks?\s+for\s+watching",
+    # "I love you, you love me" (Arabic Barney dub). Comes out of near-silence.
+    # Match both orderings but only when BOTH halves appear together, so
+    # a genuine standalone "بحبك" from a player isn't flagged.
+    r"بحبك[^\n]{0,30}بحبني",
+    r"بحبني[^\n]{0,30}بحبك",
     r"^\W*$",
 ]
 _HALLUCINATION_RE = [re.compile(p, re.IGNORECASE) for p in HALLUCINATION_PATTERNS]
@@ -521,6 +526,25 @@ def repetition_ratio(text: str) -> float:
     return 1.0 - (len(set(tokens)) / len(tokens))
 
 
+def has_ngram_loop(text: str, n: int = 2, min_repeats: int = 3) -> bool:
+    """True if any n-gram appears >= min_repeats times.
+
+    Catches short-phrase loops that repetition_ratio misses -- e.g. the
+    'X Y X Y X Y' pattern where unique-token ratio stays modest but the
+    same bigram fires over and over.
+    """
+    tokens = normalize_arabic(text).split()
+    if len(tokens) < n * min_repeats:
+        return False
+    counts: dict[tuple[str, ...], int] = {}
+    for i in range(len(tokens) - n + 1):
+        gram = tuple(tokens[i:i + n])
+        counts[gram] = counts.get(gram, 0) + 1
+        if counts[gram] >= min_repeats:
+            return True
+    return False
+
+
 def screen(text: str, chunk: Chunk) -> tuple[bool, str]:
     """Return (keep, reason_if_dropped)."""
     stripped = text.strip()
@@ -533,6 +557,9 @@ def screen(text: str, chunk: Chunk) -> tuple[bool, str]:
 
     if repetition_ratio(stripped) > 0.82:
         return False, "token-loop"
+
+    if has_ngram_loop(stripped, n=2, min_repeats=3) or has_ngram_loop(stripped, n=3, min_repeats=3):
+        return False, "ngram-loop"
 
     # A model that produces far more text than the audio could carry is
     # confabulating. English runs denser per second than Arabic, so use the
@@ -854,6 +881,26 @@ def fmt_timestamp(seconds: float, comma: bool = True) -> str:
 
 
 def write_outputs(segments: list[Segment], outdir: Path, info: dict[str, str]) -> None:
+    # Re-apply screen() to previously-kept segments so new hallucination
+    # patterns added since the transcript was recorded take effect without
+    # re-running the model. Chunks the segment was cut from are reconstructed
+    # from the segment's own timing.
+    rescreened = 0
+    for seg in segments:
+        if seg.dropped:
+            continue
+        chunk = Chunk(
+            track_index=seg.track_index, speaker=seg.speaker,
+            chunk_id=seg.chunk_id, start_s=seg.start_s, end_s=seg.end_s,
+        )
+        keep, reason = screen(seg.text, chunk)
+        if not keep:
+            seg.dropped = True
+            seg.drop_reason = reason
+            rescreened += 1
+    if rescreened:
+        print(f"  re-screen dropped {rescreened} previously-kept segment(s)")
+
     kept = sorted((s for s in segments if not s.dropped), key=lambda s: (s.start_s, s.speaker))
 
     (outdir / "transcript.json").write_text(
@@ -1064,10 +1111,27 @@ def main() -> None:
         "--check-env", action="store_true",
         help="verify ffmpeg, CUDA, VRAM and backend imports, then exit",
     )
+    parser.add_argument(
+        "--rewrite-outputs", action="store_true",
+        help=(
+            "re-apply the hallucination filter to an existing "
+            "out/segments.jsonl and regenerate transcript.txt/.srt/.json. "
+            "No zip, no model, no GPU. Use after updating filter patterns."
+        ),
+    )
     args = parser.parse_args()
 
     if args.check_env:
         sys.exit(1 if check_env(args.backend) else 0)
+    if args.rewrite_outputs:
+        jsonl = args.outdir / "segments.jsonl"
+        if not jsonl.exists():
+            sys.exit(f"error: {jsonl} not found; nothing to rewrite")
+        done = load_done(jsonl)
+        print(f"Loaded {len(done)} segments from {jsonl}")
+        write_outputs(list(done.values()), args.outdir, {})
+        print(f"Wrote transcript.txt / .srt / .json under {args.outdir}")
+        return
     if args.input is None:
         parser.error("the following arguments are required: input")
 
