@@ -31,6 +31,7 @@ import tempfile
 import time
 import wave
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Sequence
@@ -62,9 +63,13 @@ _force_utf8_console()
 # ---------------------------------------------------------------------------
 
 # A gap must be at least this long to count as a segment boundary. Shorter
-# zero-runs are just packet jitter inside a sentence -- splitting there would
-# cut words in half.
-MIN_GAP_S = 0.45
+# pauses are kept inside one chunk. 0.45 s only bridged packet jitter, which
+# cut sentences at every breath ("في حد من ال" / "النائتس بيلمحك") and fed the
+# model 1-2 s fragments it could only guess at. 1.5 s keeps a speaker's
+# sentence together; MAX_CHUNK_S still bounds the window.
+# Changing this changes chunk ids, so an output folder records the value
+# and refuses to resume under a different one.
+MIN_GAP_S = 1.5
 
 # Never emit a chunk longer than this. Whisper's encoder is hard-capped at 30s;
 # Qwen and Cohere handle more but accuracy and VRAM both degrade.
@@ -76,6 +81,22 @@ MIN_SPEECH_S = 0.35
 
 # Padding kept either side of a speech island so plosives aren't clipped.
 PAD_S = 0.20
+
+# Generation budget per chunk: TOKEN_FLOOR + TOKENS_PER_S * longest chunk in the
+# batch, capped at TOKEN_CEIL. Hallucination loops otherwise run to the cap on
+# every bad chunk. 15 tok/s sits above what screen()'s text-length ceiling lets
+# through, so anything this truncates would have been dropped anyway.
+# Skip chunks whose loudest sample is below this. Discord transmits mic hiss
+# and breathing as packets, so they survive the zero-run VAD, and QwenCleo
+# turns them into stock sentences ("...project في الـ web development").
+# Measured on a real session: hallucinated chunks peak around -45 dBFS, real
+# speech from the quietest mic around -29. -40 catches most of the former
+# without touching the latter.
+MIN_PEAK_DBFS = -40.0
+
+TOKENS_PER_S = 15
+TOKEN_FLOOR = 24
+TOKEN_CEIL = 256
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +230,9 @@ def extract_archive(src: Path, workdir: Path) -> Path:
     dest = workdir / "unpacked"
     dest.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(src) as zf:
-        zf.extractall(dest)
+        # raw.dat is Craig's undecoded packet dump (hundreds of MB) -- unused.
+        members = [m for m in zf.namelist() if Path(m).name != "raw.dat"]
+        zf.extractall(dest, members=members)
     return dest
 
 
@@ -281,7 +304,11 @@ def read_recording_info(root: Path) -> dict[str, str]:
         return {}
     info: dict[str, str] = {}
     for line in info_path.read_text(encoding="utf-8", errors="replace").splitlines():
-        if ":" in line:
+        # First line is "Recording <id>" with no colon.
+        m = re.match(r"^Recording\s+(\S+)\s*$", line)
+        if m:
+            info["Recording"] = m.group(1)
+        elif ":" in line:
             key, _, value = line.partition(":")
             key, value = key.strip(), value.strip()
             if key and value:
@@ -431,10 +458,10 @@ def quietest_split(pcm: np.memmap, lo: int, hi: int, frame: int = 1600) -> int:
     return lo + int(np.argmin(energy)) * frame + frame // 2
 
 
-def build_chunks(pcm: np.memmap, track: Track) -> list[Chunk]:
+def build_chunks(pcm: np.memmap, track: Track, min_gap_s: float = MIN_GAP_S) -> list[Chunk]:
     """Turn one track's raw samples into transcribable speech windows."""
     runs = find_voiced_runs(pcm)
-    runs = merge_runs(runs, max_gap=int(MIN_GAP_S * SR))
+    runs = merge_runs(runs, max_gap=int(min_gap_s * SR))
     runs = [(a, b) for a, b in runs if (b - a) >= int(MIN_SPEECH_S * SR)]
 
     pad = int(PAD_S * SR)
@@ -470,17 +497,57 @@ def build_chunks(pcm: np.memmap, track: Track) -> list[Chunk]:
     return chunks
 
 
-def write_chunk_wav(pcm: np.memmap, track: Track, chunk: Chunk, dest: Path) -> Path:
-    """Materialise one chunk as a 16 kHz mono WAV for the ASR backend."""
+def read_chunk_audio(pcm: np.memmap, track: Track, chunk: Chunk) -> np.ndarray:
+    """
+    Cut one chunk out of the track as float32 in [-1, 1].
+
+    Same scaling soundfile uses when reading a 16-bit WAV, so the model sees
+    exactly what it saw when chunks went through temp files.
+    """
     lo = int(round((chunk.start_s - track.offset_s) * SR))
     hi = int(round((chunk.end_s - track.offset_s) * SR))
-    data = np.asarray(pcm[max(0, lo):min(len(pcm), hi)], dtype="<i2")
+    data = np.asarray(pcm[max(0, lo):min(len(pcm), hi)], dtype=np.float32)
+    return data / 32768.0
+
+
+def write_wav(audio: np.ndarray, dest: Path) -> Path:
+    """Write float32 [-1, 1] audio as a 16 kHz mono 16-bit WAV."""
+    data = np.clip(np.round(audio * 32768.0), -32768, 32767).astype("<i2")
     with wave.open(str(dest), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(SR)
         wf.writeframes(data.tobytes())
     return dest
+
+
+def token_budget(duration_s: float) -> int:
+    return int(min(TOKEN_CEIL, TOKEN_FLOOR + TOKENS_PER_S * duration_s))
+
+
+def make_batches(chunks: list[Chunk], max_count: int, max_seconds: float) -> list[list[Chunk]]:
+    """
+    Group chunks of similar length so little of each batch is padding.
+
+    A batch is padded to its longest chunk, so mixing a 1 s "تمام" with a 28 s
+    monologue wastes most of the GPU time. Sorted longest-first, a batch grows
+    until its padded size (count x longest) would pass max_seconds, or its
+    count would pass max_count. Longest-first also means an out-of-memory
+    batch shows up in the first minute, not hours in.
+    """
+    batches: list[list[Chunk]] = []
+    current: list[Chunk] = []
+    for chunk in sorted(chunks, key=lambda c: c.duration_s, reverse=True):
+        if current and (
+            len(current) + 1 > max_count
+            or (len(current) + 1) * current[0].duration_s > max_seconds
+        ):
+            batches.append(current)
+            current = []
+        current.append(chunk)
+    if current:
+        batches.append(current)
+    return batches
 
 
 # ---------------------------------------------------------------------------
@@ -503,6 +570,13 @@ HALLUCINATION_PATTERNS = [
     # a genuine standalone "بحبك" from a player isn't flagged.
     r"بحبك[^\n]{0,30}بحبني",
     r"بحبني[^\n]{0,30}بحبك",
+    # QwenCleo's stock sentences on noise -- podcast training-data leftovers.
+    r"بنعمل\s+project",
+    r"web\s+(development|design)",
+    r"engineering\s+college",
+    r"cairo\s+university",
+    # Chinese/Japanese/Korean script: nobody in the session speaks it.
+    r"[぀-ヿ㐀-鿿가-힯]",
     r"^\W*$",
 ]
 _HALLUCINATION_RE = [re.compile(p, re.IGNORECASE) for p in HALLUCINATION_PATTERNS]
@@ -625,7 +699,8 @@ def label_script(text: str) -> str:
 
 class Backend:
     name = "base"
-    default_batch = 1
+    default_batch = 1             # max chunks per batch
+    default_batch_seconds = 60.0  # max padded audio per batch (count x longest)
     supports_hotwords = False
 
     def __init__(self, language: str = "auto", hotwords: str | None = None):
@@ -635,8 +710,13 @@ class Backend:
     def load(self) -> None:
         raise NotImplementedError
 
-    def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
-        """Return one (text, language_tag) pair per input path."""
+    def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
+        """
+        Return one (text, language_tag) pair per input.
+
+        `audio` is float32 16 kHz mono in [-1, 1]; `max_new_tokens` is sized
+        to the longest chunk in the batch.
+        """
         raise NotImplementedError
 
     def unload(self) -> None:
@@ -661,20 +741,33 @@ class QwenCleoBackend(Backend):
         pip install "qwen-asr>=0.0.6" numpy soundfile huggingface_hub
     """
     name = "qwencleo"
-    default_batch = 2
+    default_batch = 16
+    default_batch_seconds = 120.0
 
     _TAGS = {"ar": "Arabic", "en": "English", "auto": None}
 
     def load(self) -> None:
-        from qwencleo_asr import QwenCleoASR
-        self.asr = QwenCleoASR()  # wrapper loads in bfloat16 on its own
-
-    def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
-        results = self.asr.transcribe(
-            [str(p) for p in paths], language=self._TAGS[self.language]
+        import torch
+        from qwen_asr import Qwen3ASRModel
+        from qwencleo_asr import DEFAULT_MODEL_ID
+        from transformers.utils import logging as hf_logging
+        hf_logging.set_verbosity_error()
+        # Load the underlying Qwen3-ASR model directly rather than through the
+        # QwenCleoASR wrapper: the wrapper's transcribe() loops over its inputs
+        # one at a time, so it never actually batches. Same checkpoint, dtype
+        # and device the wrapper would use.
+        self.model = Qwen3ASRModel.from_pretrained(
+            DEFAULT_MODEL_ID,
+            dtype=torch.bfloat16,
+            device_map="cuda:0",
+            max_inference_batch_size=-1,  # batches are sized by make_batches()
         )
-        if not isinstance(results, list):
-            results = [results]
+
+    def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
+        self.model.max_new_tokens = max_new_tokens
+        results = self.model.transcribe(
+            [(a, SR) for a in audio], language=self._TAGS[self.language]
+        )
 
         out: list[tuple[str, str]] = []
         for r in results:
@@ -696,7 +789,8 @@ class Qwen3ASRBackend(Backend):
         pip install "transformers>=5.13.0" torch soundfile librosa accelerate
     """
     name = "qwen3asr"
-    default_batch = 2
+    default_batch = 16
+    default_batch_seconds = 120.0
     supports_hotwords = True
 
     _TAGS = {"ar": "Arabic", "en": "English", "auto": None}
@@ -710,23 +804,28 @@ class Qwen3ASRBackend(Backend):
             model_id, dtype=torch.float16, device_map="auto"
         ).eval()
 
-    def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
+    def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
         import torch
-        audio = [str(p) for p in paths]
         tag = self._TAGS[self.language]
 
-        request = {"audio": audio}
-        if tag is not None:
-            request["language"] = [tag] * len(audio)
-        if self.hotwords:
-            # Biases decoding toward your jargon so it stays in Latin script.
-            request["prompt"] = self.hotwords
+        # apply_transcription_request is fed file paths, the input form its
+        # docs show; the files only live for this batch.
+        with tempfile.TemporaryDirectory(prefix="craig_batch_") as tmp:
+            paths = [str(write_wav(a, Path(tmp) / f"{i}.wav")) for i, a in enumerate(audio)]
+            request = {"audio": paths}
+            if tag is not None:
+                request["language"] = [tag] * len(paths)
+            if self.hotwords:
+                # Biases decoding toward your jargon so it stays in Latin script.
+                request["prompt"] = self.hotwords
 
-        inputs = self.processor.apply_transcription_request(**request).to(
-            self.model.device, self.model.dtype
-        )
+            inputs = self.processor.apply_transcription_request(**request).to(
+                self.model.device, self.model.dtype
+            )
         with torch.inference_mode():
-            output_ids = self.model.generate(**inputs, max_new_tokens=256, do_sample=False)
+            output_ids = self.model.generate(
+                **inputs, max_new_tokens=max_new_tokens, do_sample=False
+            )
         generated = output_ids[:, inputs["input_ids"].shape[1]:]
 
         parsed = self.processor.decode(generated, return_format="parsed")
@@ -756,7 +855,8 @@ class CohereArabicBackend(Backend):
         pip install "transformers>=5.4.0" torch soundfile librosa sentencepiece protobuf accelerate
     """
     name = "cohere"
-    default_batch = 4
+    default_batch = 16
+    default_batch_seconds = 120.0
 
     def load(self) -> None:
         import torch
@@ -767,7 +867,7 @@ class CohereArabicBackend(Backend):
             model_id, dtype=torch.float16, device_map="auto"
         ).eval()
 
-    def _decode_with_score(self, audio, tag: str) -> list[tuple[str, float]]:
+    def _decode_with_score(self, audio, tag: str, max_new_tokens: int) -> list[tuple[str, float]]:
         """Transcribe under one language tag, returning mean token log-prob."""
         import torch
 
@@ -777,7 +877,7 @@ class CohereArabicBackend(Backend):
         with torch.inference_mode():
             result = self.model.generate(
                 **inputs,
-                max_new_tokens=256,
+                max_new_tokens=max_new_tokens,
                 output_scores=True,
                 return_dict_in_generate=True,
             )
@@ -798,20 +898,16 @@ class CohereArabicBackend(Backend):
 
         return list(zip(texts, scores))
 
-    def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
-        from transformers.audio_utils import load_audio
-
-        audio = [load_audio(str(p), sampling_rate=SR) for p in paths]
-
+    def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
         if self.language in ("ar", "en"):
             return [
                 (text, self.language)
-                for text, _ in self._decode_with_score(audio, self.language)
+                for text, _ in self._decode_with_score(audio, self.language, max_new_tokens)
             ]
 
         # auto: score both tags and keep the more confident transcription.
-        arabic = self._decode_with_score(audio, "ar")
-        english = self._decode_with_score(audio, "en")
+        arabic = self._decode_with_score(audio, "ar", max_new_tokens)
+        english = self._decode_with_score(audio, "en", max_new_tokens)
 
         out: list[tuple[str, str]] = []
         for (ar_text, ar_score), (en_text, en_score) in zip(arabic, english):
@@ -844,11 +940,13 @@ class FasterWhisperBackend(Backend):
         # int8_float16 keeps large-v3 near 3 GB, leaving headroom on an 8 GB card.
         self.model = WhisperModel(self.model_size, device="cuda", compute_type="int8_float16")
 
-    def transcribe_batch(self, paths: list[Path]) -> list[tuple[str, str]]:
+    def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
+        # Whisper decodes one input at a time and has its own length limits,
+        # so max_new_tokens is not applied here.
         out: list[tuple[str, str]] = []
-        for path in paths:
+        for samples in audio:
             segments, info = self.model.transcribe(
-                str(path),
+                samples,
                 language=None if self.language == "auto" else self.language,
                 beam_size=5,
                 vad_filter=False,          # our zero-run gate already did this
@@ -964,6 +1062,25 @@ def language_report(segments: list[Segment]) -> str:
     return "  " + "   ".join(parts)
 
 
+def transcribe_with_fallback(backend: Backend, batch: list[Chunk],
+                             audio: list[np.ndarray]) -> list[tuple[str, str] | None]:
+    """
+    Transcribe one batch; on failure (usually CUDA out-of-memory) retry it in
+    halves. A chunk that still fails on its own comes back as None.
+    """
+    try:
+        return backend.transcribe_batch(audio, token_budget(max(c.duration_s for c in batch)))
+    except Exception as exc:  # noqa: BLE001 -- never lose 8h to one bad chunk
+        backend.unload()  # release VRAM in case this was an OOM
+        if len(batch) == 1:
+            print(f"\n  ! chunk {batch[0].key} failed ({exc}); will retry on re-run")
+            return [None]
+        mid = len(batch) // 2
+        print(f"\n  ! batch of {len(batch)} failed ({type(exc).__name__}); retrying in halves")
+        return (transcribe_with_fallback(backend, batch[:mid], audio[:mid])
+                + transcribe_with_fallback(backend, batch[mid:], audio[mid:]))
+
+
 def load_done(jsonl: Path) -> dict[str, Segment]:
     """Read already-transcribed segments so a re-run resumes where it stopped."""
     done: dict[str, Segment] = {}
@@ -1001,22 +1118,85 @@ def load_speaker_map(path: Path) -> dict[str, str]:
     return mapping
 
 
+def map_speaker(name: str, speaker_map: dict[str, str]) -> str | None:
+    """Look up a Discord username: exact match first, then glob patterns (jockie*, megadon*)."""
+    import fnmatch
+    uname = name.lower()
+    renamed = speaker_map.get(uname)
+    if renamed is None:
+        for pat, target in speaker_map.items():
+            if any(ch in pat for ch in "*?[") and fnmatch.fnmatchcase(uname, pat):
+                return target
+    return renamed
+
+
+# Folders written before the gap setting was recorded all used this value.
+LEGACY_MIN_GAP_S = 0.45
+
+
+def check_recording_match(outdir: Path, info: dict[str, str], min_gap_s: float) -> None:
+    """
+    Refuse to resume into an outdir that holds a different recording, or the
+    same recording cut into chunks with a different --min-gap.
+
+    Resume keys are "<track_index>:<chunk_id>", which every Craig recording
+    reuses, and which point at different audio once the gap setting changes.
+    Either mismatch would silently skip audio and keep text attached to the
+    wrong chunks.
+    """
+    marker = outdir / "recording.json"
+    current = info.get("Recording", "")
+    has_segments = (outdir / "segments.jsonl").exists()
+    if marker.exists():
+        saved = json.loads(marker.read_text(encoding="utf-8"))
+        previous = saved.get("Recording", "")
+        if previous and current and previous != current:
+            sys.exit(
+                f"error: {outdir} already holds recording {previous}, but the input is "
+                f"{current}. Use a different -o directory."
+            )
+        saved_gap = float(saved.get("Min gap s", LEGACY_MIN_GAP_S))
+        if has_segments and saved_gap != min_gap_s:
+            sys.exit(
+                f"error: {outdir} was transcribed with --min-gap {saved_gap:g}, but this run "
+                f"uses {min_gap_s:g}, which cuts the audio into different chunks.\n"
+                f"  To finish or rewrite that folder: add --min-gap {saved_gap:g}\n"
+                f"  To transcribe with the new setting: use a different -o directory."
+            )
+    elif has_segments:
+        sys.exit(
+            f"error: {outdir} has a segments.jsonl from an unknown recording. "
+            f"Use a different -o directory (or delete it to start over)."
+        )
+    marker.write_text(
+        json.dumps({**info, "Min gap s": f"{min_gap_s:g}"}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def chunk_peak_db(pcm: np.memmap, track: Track, chunk: Chunk) -> float:
+    """Loudest sample in the chunk, in dBFS (0 = full scale)."""
+    lo = max(0, int(round((chunk.start_s - track.offset_s) * SR)))
+    hi = min(len(pcm), int(round((chunk.end_s - track.offset_s) * SR)))
+    peak = int(np.abs(np.asarray(pcm[lo:hi], dtype=np.int32)).max()) if hi > lo else 0
+    return 20 * np.log10(max(peak, 1) / 32768.0)
+
+
 def plan(root: Path, scratch: Path, limit_s: float | None,
          speaker_map: dict[str, str] | None = None,
-         ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path]]:
+         min_peak_db: float = MIN_PEAK_DBFS,
+         min_gap_s: float = MIN_GAP_S,
+         ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path], set[str]]:
+    """
+    Decode and segment every track. Chunks quieter than min_peak_db are left
+    out of the plan and their keys returned separately, so chunk ids (and
+    resume) are unaffected by the threshold.
+    """
     tracks = discover_tracks(root)
     if speaker_map:
-        import fnmatch
         kept: list[Track] = []
         for t in tracks:
-            uname = t.speaker.lower()
-            # Try exact match first, then fnmatch patterns (jockie*, megadon*).
-            renamed = speaker_map.get(uname)
-            if renamed is None:
-                for pat, target in speaker_map.items():
-                    if any(ch in pat for ch in "*?[") and fnmatch.fnmatchcase(uname, pat):
-                        renamed = target
-                        break
+            renamed = map_speaker(t.speaker, speaker_map)
             if renamed is None:
                 kept.append(t)
                 continue
@@ -1028,6 +1208,7 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
         tracks = kept
     pcm_paths: dict[int, Path] = {}
     plans: dict[int, list[Chunk]] = {}
+    quiet: set[str] = set()
 
     for track in tracks:
         pcm_path = scratch / f"track{track.index}.wav"
@@ -1036,22 +1217,26 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
 
         pcm = open_pcm(pcm_path)
         try:
-            chunks = build_chunks(pcm, track)
+            chunks = build_chunks(pcm, track, min_gap_s)
+            if limit_s is not None:
+                chunks = [c for c in chunks if c.end_s <= limit_s]
+            loud = [c for c in chunks if chunk_peak_db(pcm, track, c) >= min_peak_db]
         finally:
             close_pcm(pcm)
-        if limit_s is not None:
-            chunks = [c for c in chunks if c.end_s <= limit_s]
-        plans[track.index] = chunks
+        loud_keys = {c.key for c in loud}
+        quiet.update(c.key for c in chunks if c.key not in loud_keys)
+        plans[track.index] = loud
 
-        speech = sum(c.duration_s for c in chunks)
+        speech = sum(c.duration_s for c in loud)
         total = len(pcm) / SR
         pct = (100 * speech / total) if total else 0.0
         print(
             f"  track {track.index:>2}  {track.speaker:<24} "
             f"{total / 3600:6.2f}h audio -> {speech / 60:8.2f} min speech "
-            f"({pct:5.1f}%) in {len(chunks)} chunks"
+            f"({pct:5.1f}%) in {len(loud)} chunks"
+            + (f", {len(chunks) - len(loud)} too quiet" if len(loud) < len(chunks) else "")
         )
-    return tracks, plans, pcm_paths
+    return tracks, plans, pcm_paths, quiet
 
 
 def main() -> None:
@@ -1089,7 +1274,35 @@ def main() -> None:
             "are ignored. Match is case-insensitive on the Discord username."
         ),
     )
-    parser.add_argument("--batch-size", type=int, default=None, help="override the backend default")
+    parser.add_argument(
+        "--min-gap", type=float, default=MIN_GAP_S, metavar="SECONDS",
+        help=(
+            f"a pause must be at least this long to split a speaker's speech "
+            f"into separate chunks (default {MIN_GAP_S:g}). Folders made before "
+            f"this option existed used {LEGACY_MIN_GAP_S:g}; pass that to resume them."
+        ),
+    )
+    parser.add_argument(
+        "--min-peak-db", type=float, default=MIN_PEAK_DBFS, metavar="DBFS",
+        help=(
+            f"skip chunks whose loudest sample is below this level "
+            f"(default {MIN_PEAK_DBFS:g}). These are mic hiss and breathing that "
+            f"the model turns into invented sentences. Raise toward -35 for more "
+            f"aggressive filtering; -120 disables it."
+        ),
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=None,
+        help="max chunks per batch (default: backend's, 16 for qwencleo)",
+    )
+    parser.add_argument(
+        "--batch-seconds", type=float, default=None, metavar="SECONDS",
+        help=(
+            "max padded audio per batch, i.e. chunk count x longest chunk "
+            "(default: backend's, 120 for qwencleo). Lower it on out-of-memory "
+            "errors, raise it if VRAM is to spare."
+        ),
+    )
     parser.add_argument(
         "--limit", type=float, default=None, metavar="SECONDS",
         help="only transcribe the first N seconds -- use this to benchmark backends",
@@ -1129,7 +1342,16 @@ def main() -> None:
             sys.exit(f"error: {jsonl} not found; nothing to rewrite")
         done = load_done(jsonl)
         print(f"Loaded {len(done)} segments from {jsonl}")
-        write_outputs(list(done.values()), args.outdir, {})
+        if args.speaker_map:
+            # Rename segments transcribed before the map had an entry for them.
+            speaker_map = load_speaker_map(args.speaker_map)
+            for seg in done.values():
+                renamed = map_speaker(seg.speaker, speaker_map)
+                if renamed and renamed.upper() not in {"SKIP", "-", "IGNORE"}:
+                    seg.speaker = renamed
+        marker = args.outdir / "recording.json"
+        info = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else {}
+        write_outputs(list(done.values()), args.outdir, info)
         print(f"Wrote transcript.txt / .srt / .json under {args.outdir}")
         return
     if args.input is None:
@@ -1148,6 +1370,8 @@ def main() -> None:
             print("Recording:")
             for key, value in info.items():
                 print(f"  {key}: {value}")
+        if not args.dry_run:
+            check_recording_match(args.outdir, info, args.min_gap)
 
         speaker_map = load_speaker_map(args.speaker_map) if args.speaker_map else None
         if speaker_map:
@@ -1155,7 +1379,10 @@ def main() -> None:
 
         print("\nSegmenting tracks (zero-run VAD):")
         t0 = time.time()
-        tracks, plans, pcm_paths = plan(root, scratch, args.limit, speaker_map=speaker_map)
+        tracks, plans, pcm_paths, quiet = plan(
+            root, scratch, args.limit, speaker_map=speaker_map,
+            min_peak_db=args.min_peak_db, min_gap_s=args.min_gap,
+        )
         total_chunks = sum(len(c) for c in plans.values())
         total_speech = sum(c.duration_s for cs in plans.values() for c in cs)
         print(
@@ -1175,46 +1402,64 @@ def main() -> None:
         if hotwords and not backend.supports_hotwords:
             print(f"  note: backend '{backend.name}' ignores --hotwords")
         batch_size = args.batch_size or backend.default_batch
-        print(
-            f"\nLoading backend '{backend.name}' "
-            f"(batch size {batch_size}, language={args.language})..."
-        )
-        backend.load()
+        batch_seconds = args.batch_seconds or backend.default_batch_seconds
 
         jsonl = args.outdir / "segments.jsonl"
         done = load_done(jsonl)
         if done:
-            print(f"Resuming: {len(done)} segments already transcribed.")
+            print(f"\nResuming: {len(done)} segments already transcribed.")
+        # Segments transcribed before the level gate existed (or under a lower
+        # threshold) are hidden from the outputs; segments.jsonl keeps them.
+        for key, seg in done.items():
+            if key in quiet and not seg.dropped:
+                seg.dropped, seg.drop_reason = True, "too-quiet"
 
         segments: list[Segment] = list(done.values())
         pending = [c for cs in plans.values() for c in cs if c.key not in done]
-        chunk_dir = scratch / "chunks"
-        chunk_dir.mkdir(exist_ok=True)
+        if pending:
+            print(
+                f"\nLoading backend '{backend.name}' (batch up to {batch_size} chunks / "
+                f"{batch_seconds:g}s padded audio, language={args.language})..."
+            )
+            backend.load()
+        pending_speech = sum(c.duration_s for c in pending)
+        batches = make_batches(pending, batch_size, batch_seconds)
+        print(f"{len(pending)} chunks to transcribe in {len(batches)} batches (longest first).")
+
+        track_by_index = {t.index: t for t in tracks}
+        pcms = {
+            t.index: open_pcm(pcm_paths[t.index])
+            for t in tracks if any(c.key not in done for c in plans[t.index])
+        }
+
+        def load_batch(batch: list[Chunk]) -> list[np.ndarray]:
+            return [
+                read_chunk_audio(pcms[c.track_index], track_by_index[c.track_index], c)
+                for c in batch
+            ]
 
         processed_audio = 0.0
+        failed = 0
         start = time.time()
 
-        with jsonl.open("a", encoding="utf-8") as sink:
-            for track in tracks:
-                todo = [c for c in plans[track.index] if c.key not in done]
-                if not todo:
-                    continue
-                pcm = open_pcm(pcm_paths[track.index])
-                print(f"\n[{track.speaker}] {len(todo)} chunks")
+        try:
+            with jsonl.open("a", encoding="utf-8") as sink, \
+                    ThreadPoolExecutor(max_workers=1) as prefetch:
+                upcoming = prefetch.submit(load_batch, batches[0]) if batches else None
+                for i, batch in enumerate(batches):
+                    audio = upcoming.result()
+                    # Cut the next batch's audio on the CPU while the GPU works on this one.
+                    if i + 1 < len(batches):
+                        upcoming = prefetch.submit(load_batch, batches[i + 1])
 
-                for i in range(0, len(todo), batch_size):
-                    batch = todo[i:i + batch_size]
-                    paths = [
-                        write_chunk_wav(pcm, track, c, chunk_dir / f"{c.track_index}_{c.chunk_id}.wav")
-                        for c in batch
-                    ]
-                    try:
-                        results = backend.transcribe_batch(paths)
-                    except Exception as exc:  # noqa: BLE001 -- never lose 8h to one bad chunk
-                        print(f"  ! batch failed ({exc}); skipping {len(batch)} chunks")
-                        results = [("", "")] * len(batch)
+                    results = transcribe_with_fallback(backend, batch, audio)
 
-                    for chunk, (text, lang) in zip(batch, results):
+                    for chunk, result in zip(batch, results):
+                        if result is None:
+                            # Not written to segments.jsonl, so a re-run retries it.
+                            failed += 1
+                            continue
+                        text, lang = result
                         keep, reason = screen(text, chunk)
                         seg = Segment(
                             speaker=chunk.speaker,
@@ -1231,29 +1476,31 @@ def main() -> None:
                         sink.write(json.dumps(asdict(seg), ensure_ascii=False) + "\n")
                     sink.flush()
 
-                    for path in paths:
-                        path.unlink(missing_ok=True)
-
                     processed_audio += sum(c.duration_s for c in batch)
                     elapsed = time.time() - start
                     rtf = processed_audio / elapsed if elapsed else 0
-                    remaining = (total_speech - processed_audio) / rtf if rtf else 0
-                    pct = 100 * processed_audio / total_speech if total_speech else 100
+                    remaining = max(0.0, pending_speech - processed_audio) / rtf if rtf else 0
+                    pct = 100 * processed_audio / pending_speech if pending_speech else 100
                     print(
-                        f"  {pct:5.1f}%  {processed_audio / 60:7.1f}/{total_speech / 60:.1f} min  "
+                        f"  {pct:5.1f}%  {processed_audio / 60:7.1f}/{pending_speech / 60:.1f} min  "
                         f"{rtf:5.1f}x realtime  eta {remaining / 60:5.1f} min",
                         end="\r", flush=True,
                     )
-                close_pcm(pcm)
                 print()
+        finally:
+            for pcm in pcms.values():
+                close_pcm(pcm)
 
         backend.unload()
         write_outputs(segments, args.outdir, info)
 
         kept = sum(1 for s in segments if not s.dropped)
         print(
-            f"\nDone. {kept} segments kept, {len(segments) - kept} filtered."
+            f"\nDone. {kept} segments kept, {len(segments) - kept} filtered, "
+            f"{len(quiet)} chunks skipped as too quiet (below {args.min_peak_db:g} dBFS)."
         )
+        if failed:
+            print(f"  {failed} chunk(s) failed -- re-run the same command to retry them.")
         report = language_report(segments)
         if report:
             print("Script mix (by output, not by requested tag):")

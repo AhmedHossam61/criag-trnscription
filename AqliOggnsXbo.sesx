@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+              <!DOCTYPE sesx>
+              <sesx version="1.8">
+                <session appBuild="13.0.0.519" appVersion="13.0" audioChannelType="stereo" bitDepth="32" duration="184247048" sampleRate="48000">
+                  <tracks>
+                    <audioTrack automationLaneOpenState="false" id="10001" index="1" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>1-geniusgamerm</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="1-geniusgamerm.flac" clipAutoCrossfade="false" startPoint="0" endPoint="184247048" fileID="0" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="184247048" zOrder="2"/>
+</audioTrack>
+                    <audioTrack automationLaneOpenState="false" id="10002" index="2" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>2-abdoo_</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="2-abdoo_.flac" clipAutoCrossfade="false" startPoint="0" endPoint="184246026" fileID="1" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="184246026" zOrder="2"/>
+</audioTrack>
+                    <audioTrack automationLaneOpenState="false" id="10003" index="3" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>3-ahmedhoss61</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="3-ahmedhoss61.flac" clipAutoCrossfade="false" startPoint="0" endPoint="184238080" fileID="2" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="184238080" zOrder="2"/>
+</audioTrack>
+                    <audioTrack automationLaneOpenState="false" id="10004" index="4" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>4-Jockie_Music_8158</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="4-Jockie_Music_8158.flac" clipAutoCrossfade="false" startPoint="0" endPoint="183990150" fileID="3" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="183990150" zOrder="2"/>
+</audioTrack>
+                    <audioTrack automationLaneOpenState="false" id="10005" index="5" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>5-hazemonsif</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="5-hazemonsif.flac" clipAutoCrossfade="false" startPoint="0" endPoint="183840768" fileID="4" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="183840768" zOrder="2"/>
+</audioTrack>
+                    <audioTrack automationLaneOpenState="false" id="10006" index="6" select="true" visible="true">
+  <trackParameters trackHeight="53" trackHue="160" trackMinimized="false">
+    <name>6-seifeldien</name>
+  </trackParameters>
+  <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="false">
+    <trackOutput outputID="10000" type="trackID"/>
+    <trackInput inputID="1"/>
+  </trackAudioParameters>
+  <audioClip name="6-seifeldien.flac" clipAutoCrossfade="false" startPoint="0" endPoint="183341056" fileID="5" hue="-1" id="0" lockedInTime="false" looped="false" offline="false" select="false" sourceInPoint="0" sourceOutPoint="183341056" zOrder="2"/>
+</audioTrack>
+                    <masterTrack automationLaneOpenState="false" id="10000" index="7" select="false" visible="true">
+                      <trackParameters trackHeight="53" trackHue="-1" trackMinimized="false">
+                        <name>Master</name>
+                      </trackParameters>
+                      <trackAudioParameters audioChannelType="stereo" automationMode="1" monitoring="false" recordArmed="false" solo="false" soloSafe="true">
+                        <trackOutput outputID="1" type="hardwareOutput"/>
+                        <trackInput inputID="-1"/>
+                      </trackAudioParameters>
+                    </masterTrack>
+                  </tracks>
+                  <sessionState ctiPosition="0" smpteStart="0">
+                    <timeFormatState beatsPerBar="4" beatsPerMinute="120" customFrameRate="12" linkToDefaultTimeSettings="true" noteLength="4" subdivisions="16" timeCodeDropFrame="false" timeCodeFrameRate="30" timeCodeNTSC="false" timeFormat="timeFormatDecimal"/>
+                    <mixingOptionState defaultPanModeLogarithmic="false" panPower="-3" playOverlappingClips="false"/>
+                  </sessionState>
+                  <xmpMetadata>
+                    <![CDATA[
+                      <?xpacket id="W5M0MpCehiHzreSzNTczkc9d"?>
+                        <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.6-c148 79.164036, 2019/08/13-01:06:57        ">
+                          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                            <rdf:Description rdf:about=""
+                                  xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+                                  xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"
+                                  xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#"
+                                  xmlns:dc="http://purl.org/dc/elements/1.1/"
+                                  xmlns:xmpDM="http://ns.adobe.com/xmp/1.0/DynamicMedia/">
+                              <xmp:CreatorTool>Craig (craig.chat)</xmp:CreatorTool>
+                              <xmp:CreateDate>2026-09-04T04:26:35.883Z</xmp:CreateDate>
+                              <xmp:MetadataDate>2026-09-04T04:26:35.883Z</xmp:MetadataDate>
+                              <xmp:ModifyDate>2026-09-04T04:26:35.883Z</xmp:ModifyDate>
+                              <dc:format>application/xml</dc:format>
+                              <xmpDM:Tracks>
+                                <rdf:Bag>
+                                  <rdf:li rdf:parseType="Resource">
+                                    <xmpDM:trackName>Craig Notes</xmpDM:trackName>
+                                    <xmpDM:trackType>Cue</xmpDM:trackType>
+                                    <xmpDM:frameRate>f48000</xmpDM:frameRate>
+                                    <xmpDM:markers>
+                                      <rdf:Seq>
+                                        
+                                      </rdf:Seq>
+                                    </xmpDM:markers>
+                                  </rdf:li>
+                                </rdf:Bag>
+                              </xmpDM:Tracks>
+                            </rdf:Description>
+                          </rdf:RDF>
+                        </x:xmpmeta>
+                      <?xpacket end="w"?>
+                    ]]>
+                  </xmpMetadata>
+                </session>
+
+                <files>
+                  <file id="0" relativePath="AqliOggnsXbo_data/1-geniusgamerm.flac"/>
+                  <file id="1" relativePath="AqliOggnsXbo_data/2-abdoo_.flac"/>
+                  <file id="2" relativePath="AqliOggnsXbo_data/3-ahmedhoss61.flac"/>
+                  <file id="3" relativePath="AqliOggnsXbo_data/4-Jockie_Music_8158.flac"/>
+                  <file id="4" relativePath="AqliOggnsXbo_data/5-hazemonsif.flac"/>
+                  <file id="5" relativePath="AqliOggnsXbo_data/6-seifeldien.flac"/>
+                </files>
+              </sesx>
