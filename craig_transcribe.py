@@ -1081,6 +1081,66 @@ def transcribe_with_fallback(backend: Backend, batch: list[Chunk],
                 + transcribe_with_fallback(backend, batch[mid:], audio[mid:]))
 
 
+def run_batches(backend: Backend, batches: list[list[Chunk]], load_batch,
+                jsonl: Path, segments: list[Segment]) -> int:
+    """
+    Transcribe every batch, appending each result to `segments` and to
+    segments.jsonl as it lands. `load_batch(batch)` returns the batch's audio;
+    it runs on a worker thread so the next batch is cut while the GPU works.
+    Returns the number of chunks that failed (left out of the jsonl, so a
+    re-run retries them).
+    """
+    pending_speech = sum(c.duration_s for b in batches for c in b)
+    processed_audio = 0.0
+    failed = 0
+    start = time.time()
+
+    with jsonl.open("a", encoding="utf-8") as sink, \
+            ThreadPoolExecutor(max_workers=1) as prefetch:
+        upcoming = prefetch.submit(load_batch, batches[0]) if batches else None
+        for i, batch in enumerate(batches):
+            audio = upcoming.result()
+            # Cut the next batch's audio on the CPU while the GPU works on this one.
+            if i + 1 < len(batches):
+                upcoming = prefetch.submit(load_batch, batches[i + 1])
+
+            results = transcribe_with_fallback(backend, batch, audio)
+
+            for chunk, result in zip(batch, results):
+                if result is None:
+                    failed += 1
+                    continue
+                text, lang = result
+                keep, reason = screen(text, chunk)
+                seg = Segment(
+                    speaker=chunk.speaker,
+                    start_s=round(chunk.start_s, 3),
+                    end_s=round(chunk.end_s, 3),
+                    text=text.strip(),
+                    language=lang or label_script(text),
+                    track_index=chunk.track_index,
+                    chunk_id=chunk.chunk_id,
+                    dropped=not keep,
+                    drop_reason=reason,
+                )
+                segments.append(seg)
+                sink.write(json.dumps(asdict(seg), ensure_ascii=False) + "\n")
+            sink.flush()
+
+            processed_audio += sum(c.duration_s for c in batch)
+            elapsed = time.time() - start
+            rtf = processed_audio / elapsed if elapsed else 0
+            remaining = max(0.0, pending_speech - processed_audio) / rtf if rtf else 0
+            pct = 100 * processed_audio / pending_speech if pending_speech else 100
+            print(
+                f"  {pct:5.1f}%  {processed_audio / 60:7.1f}/{pending_speech / 60:.1f} min  "
+                f"{rtf:5.1f}x realtime  eta {remaining / 60:5.1f} min",
+                end="\r", flush=True,
+            )
+        print()
+    return failed
+
+
 def load_done(jsonl: Path) -> dict[str, Segment]:
     """Read already-transcribed segments so a re-run resumes where it stopped."""
     done: dict[str, Segment] = {}
@@ -1422,7 +1482,6 @@ def main() -> None:
                 f"{batch_seconds:g}s padded audio, language={args.language})..."
             )
             backend.load()
-        pending_speech = sum(c.duration_s for c in pending)
         batches = make_batches(pending, batch_size, batch_seconds)
         print(f"{len(pending)} chunks to transcribe in {len(batches)} batches (longest first).")
 
@@ -1438,55 +1497,8 @@ def main() -> None:
                 for c in batch
             ]
 
-        processed_audio = 0.0
-        failed = 0
-        start = time.time()
-
         try:
-            with jsonl.open("a", encoding="utf-8") as sink, \
-                    ThreadPoolExecutor(max_workers=1) as prefetch:
-                upcoming = prefetch.submit(load_batch, batches[0]) if batches else None
-                for i, batch in enumerate(batches):
-                    audio = upcoming.result()
-                    # Cut the next batch's audio on the CPU while the GPU works on this one.
-                    if i + 1 < len(batches):
-                        upcoming = prefetch.submit(load_batch, batches[i + 1])
-
-                    results = transcribe_with_fallback(backend, batch, audio)
-
-                    for chunk, result in zip(batch, results):
-                        if result is None:
-                            # Not written to segments.jsonl, so a re-run retries it.
-                            failed += 1
-                            continue
-                        text, lang = result
-                        keep, reason = screen(text, chunk)
-                        seg = Segment(
-                            speaker=chunk.speaker,
-                            start_s=round(chunk.start_s, 3),
-                            end_s=round(chunk.end_s, 3),
-                            text=text.strip(),
-                            language=lang or label_script(text),
-                            track_index=chunk.track_index,
-                            chunk_id=chunk.chunk_id,
-                            dropped=not keep,
-                            drop_reason=reason,
-                        )
-                        segments.append(seg)
-                        sink.write(json.dumps(asdict(seg), ensure_ascii=False) + "\n")
-                    sink.flush()
-
-                    processed_audio += sum(c.duration_s for c in batch)
-                    elapsed = time.time() - start
-                    rtf = processed_audio / elapsed if elapsed else 0
-                    remaining = max(0.0, pending_speech - processed_audio) / rtf if rtf else 0
-                    pct = 100 * processed_audio / pending_speech if pending_speech else 100
-                    print(
-                        f"  {pct:5.1f}%  {processed_audio / 60:7.1f}/{pending_speech / 60:.1f} min  "
-                        f"{rtf:5.1f}x realtime  eta {remaining / 60:5.1f} min",
-                        end="\r", flush=True,
-                    )
-                print()
+            failed = run_batches(backend, batches, load_batch, jsonl, segments)
         finally:
             for pcm in pcms.values():
                 close_pcm(pcm)

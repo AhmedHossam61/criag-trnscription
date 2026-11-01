@@ -33,3 +33,8 @@ qwen-asr>=0.0.6
 numpy>=1.24
 soundfile
 huggingface_hub
+
+# phone_transcribe.py only (one mixed recording -> who spoke when).
+# Neither changes the torch install.
+pyannote.audio>=4.0
+silero-vad>=6.0
