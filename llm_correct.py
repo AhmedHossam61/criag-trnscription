@@ -14,8 +14,11 @@ original. Built for the free tier's ~20 calls/day: one call per window
 (30 min by default, so 12 calls for a 6-hour session), progress is saved after
 every call, and a re-run continues with the windows that are left.
 
+API keys are read from .env next to this script (GEMINI_API=..., and
+GEMINI_API_2=... etc. as spares that take over when one runs out of quota),
+or from $GEMINI_API_KEY / --api-key.
+
 Usage:
-    $env:GEMINI_API_KEY = "..."
     python llm_correct.py -o out-v3owGZBtlLQA --audio "craig-v3ow....sesx.zip" --speaker-map speaker_map.txt
     python llm_correct.py -o out-phone-session1 --audio session.m4a
     python llm_correct.py -o out-v3owGZBtlLQA --dry-run       # plan only, no calls
@@ -24,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -101,17 +105,80 @@ def quota_day() -> str:
     return datetime.now(timezone(timedelta(hours=-8))).strftime("%Y-%m-%d")
 
 
-def calls_today() -> int:
-    if not USAGE_FILE.exists():
-        return 0
-    return json.loads(USAGE_FILE.read_text(encoding="utf-8")).get(quota_day(), 0)
+def fingerprint(key: str) -> str:
+    """Usage is tracked per key without writing the key itself to disk."""
+    return hashlib.sha256(key.encode()).hexdigest()[:10]
 
 
-def count_call() -> None:
-    usage = json.loads(USAGE_FILE.read_text(encoding="utf-8")) if USAGE_FILE.exists() else {}
-    day = quota_day()
-    usage = {day: usage.get(day, 0) + 1}  # older days aren't needed
-    USAGE_FILE.write_text(json.dumps(usage), encoding="utf-8")
+def read_dotenv(path: Path) -> dict[str, str]:
+    """Minimal .env reader: NAME=value lines, optional quotes, '#' comments."""
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        values[name.strip().removeprefix("export ").strip()] = value.strip().strip("'\"")
+    return values
+
+
+def api_keys(cli_key: str | None) -> list[str]:
+    """
+    Every Gemini key available, in the order to use them: --api-key, then
+    $GEMINI_API_KEY / $GOOGLE_API_KEY, then .env entries whose name starts
+    with GEMINI_API (GEMINI_API, GEMINI_API_2, ...). When one runs out of
+    quota the next takes over.
+    """
+    found = [cli_key, os.environ.get("GEMINI_API_KEY"), os.environ.get("GOOGLE_API_KEY")]
+    dotenv = read_dotenv(Path(__file__).with_name(".env"))
+    found += [dotenv[name] for name in sorted(dotenv) if name.upper().startswith("GEMINI_API")]
+    keys: list[str] = []
+    for key in found:
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+class KeyPool:
+    """Hands out the next key that still has calls left today."""
+
+    def __init__(self, keys: list[str], daily_limit: int):
+        self.keys = keys
+        self.daily_limit = daily_limit
+        self.exhausted: set[str] = set()  # hit a quota error this run
+        self.clients: dict[str, object] = {}
+
+    def _usage(self) -> dict[str, int]:
+        usage = json.loads(USAGE_FILE.read_text(encoding="utf-8")) if USAGE_FILE.exists() else {}
+        day = usage.get(quota_day(), {})
+        return day if isinstance(day, dict) else {}  # older format counted all keys together
+
+    def left_today(self) -> int:
+        usage = self._usage()
+        return sum(max(0, self.daily_limit - usage.get(fingerprint(k), 0))
+                   for k in self.keys if k not in self.exhausted)
+
+    def current(self) -> tuple[str, object] | None:
+        usage = self._usage()
+        for i, key in enumerate(self.keys):
+            if key in self.exhausted or usage.get(fingerprint(key), 0) >= self.daily_limit:
+                continue
+            if key not in self.clients:
+                from google import genai
+                self.clients[key] = genai.Client(api_key=key)
+            return f"key {i + 1}", self.clients[key]
+        return None
+
+    def count_call(self, label: str) -> None:
+        key = self.keys[int(label.split()[1]) - 1]
+        usage = self._usage()
+        usage[fingerprint(key)] = usage.get(fingerprint(key), 0) + 1
+        USAGE_FILE.write_text(json.dumps({quota_day(): usage}), encoding="utf-8")  # older days dropped
+
+    def mark_exhausted(self, label: str) -> None:
+        self.exhausted.add(self.keys[int(label.split()[1]) - 1])
 
 
 def load_json(path: Path, default):
@@ -179,13 +246,13 @@ class AudioSource:
 # Gemini
 # ---------------------------------------------------------------------------
 
-def make_client(api_key: str | None):
-    from google import genai
-    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        sys.exit("error: no API key. Create one at https://aistudio.google.com/apikey, then\n"
-                 '  $env:GEMINI_API_KEY = "..."   (or pass --api-key)')
-    return genai.Client(api_key=key)
+def require_keys(cli_key: str | None) -> list[str]:
+    keys = api_keys(cli_key)
+    if not keys:
+        sys.exit("error: no API key. Create one at https://aistudio.google.com/apikey and put it\n"
+                 "  in .env next to this script as GEMINI_API=... (add GEMINI_API_2=... for a\n"
+                 "  second key), or set $env:GEMINI_API_KEY, or pass --api-key.")
+    return keys
 
 
 def ask_gemini(client, model: str, system: str, prompt: str, audio: Path | None) -> list[dict]:
@@ -295,9 +362,10 @@ def main() -> None:
                         help="minutes of session per call (default 30 with audio, 60 without)")
     parser.add_argument("--model", default=os.environ.get("GEMINI_MODEL", DEFAULT_MODEL),
                         help=f"Gemini model (default {DEFAULT_MODEL}, or $GEMINI_MODEL)")
-    parser.add_argument("--api-key", default=None, help="default: $GEMINI_API_KEY")
+    parser.add_argument("--api-key", default=None,
+                        help="default: $GEMINI_API_KEY, then GEMINI_API, GEMINI_API_2, ... in .env")
     parser.add_argument("--daily-limit", type=int, default=20, metavar="N",
-                        help="stop after N calls per day across all folders (default 20)")
+                        help="calls per day per key, across all folders (default 20)")
     parser.add_argument("--max-calls", type=int, default=None, metavar="N",
                         help="stop after N calls in this run, e.g. 1 to try it out")
     parser.add_argument("--redo", action="store_true",
@@ -311,7 +379,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.list_models:
-        client = make_client(args.api_key)
+        from google import genai
+        client = genai.Client(api_key=require_keys(args.api_key)[0])
         for m in client.models.list():
             if "generateContent" in (getattr(m, "supported_actions", None) or []):
                 print(m.name.removeprefix("models/"))
@@ -367,10 +436,10 @@ def main() -> None:
             windows.append((w, lines))
     pending = [(w, lines) for w, lines in windows if w not in done]
 
-    left = args.daily_limit - calls_today()
+    pool = KeyPool(api_keys(args.api_key), args.daily_limit)
     print(f"{len(kept)} lines in {len(windows)} window(s) of {window_s / 60:g} min "
           f"({mode}, model {args.model}); {len(pending)} still to do, "
-          f"{max(left, 0)} call(s) left today.")
+          f"{len(pool.keys)} API key(s) with {pool.left_today()} call(s) left today.")
     if not glossary:
         print(f"  note: no glossary at {args.glossary} -- names and game terms will be guessed")
     if args.dry_run or not pending:
@@ -378,19 +447,20 @@ def main() -> None:
             rewrite(outdir, segments, info)
             print("All windows done.")
         return
-    if left <= 0:
-        sys.exit("Daily call limit reached; run the same command again tomorrow to continue.")
+    require_keys(args.api_key)
+    if pool.current() is None:
+        sys.exit("Daily call limit reached on every key; run the same command again tomorrow.")
 
     if use_audio:
         require_ffmpeg()
-    client = make_client(args.api_key)
     speaker_map = load_speaker_map(args.speaker_map) if args.speaker_map else None
     scratch = Path(tempfile.mkdtemp(prefix="llm_"))
     calls = 0
+    out_of_calls = False
     try:
         audio_src = AudioSource(args.audio, scratch, speaker_map, info) if use_audio else None
         for w, lines in pending:
-            if calls_today() >= args.daily_limit or (args.max_calls and calls >= args.max_calls):
+            if out_of_calls or (args.max_calls and calls >= args.max_calls):
                 print("Stopping here (call limit); run the same command again to continue.")
                 break
             start = w * window_s
@@ -408,18 +478,30 @@ def main() -> None:
             prompt = build_prompt(glossary, speakers, text_lines, use_audio)
 
             label = f"{fmt_timestamp(start, comma=False)[:-4]}-{fmt_timestamp(end, comma=False)[:-4]}"
-            print(f"  window {label}: {len(lines)} lines ...", end=" ", flush=True)
-            count_call()
-            calls += 1
-            try:
-                fixes = ask_gemini(client, args.model, SYSTEM_AUDIO if use_audio else SYSTEM_TEXT,
-                                   prompt, audio)
-            except Exception as exc:  # noqa: BLE001 -- keep what's done, report, move on
-                if is_quota_error(exc):
-                    print("quota exhausted.")
-                    print("Gemini's limit is reached for now; run the same command later to continue.")
+            fixes = None
+            while fixes is None:
+                picked = pool.current()
+                if picked is None:
+                    print("no key has calls left.")
+                    out_of_calls = True
                     break
-                print(f"failed ({type(exc).__name__}: {str(exc)[:200]}); will retry on re-run")
+                key_label, client = picked
+                print(f"  window {label}: {len(lines)} lines ({key_label}) ...", end=" ", flush=True)
+                pool.count_call(key_label)
+                calls += 1
+                try:
+                    fixes = ask_gemini(client, args.model,
+                                       SYSTEM_AUDIO if use_audio else SYSTEM_TEXT, prompt, audio)
+                except Exception as exc:  # noqa: BLE001 -- keep what's done, report, move on
+                    if is_quota_error(exc):
+                        print(f"{key_label} is out of quota; trying the next key.")
+                        pool.mark_exhausted(key_label)
+                        continue
+                    print(f"failed ({type(exc).__name__}: {str(exc)[:200]}); will retry on re-run")
+                    break
+            if fixes is None:
+                if out_of_calls:
+                    break
                 continue
 
             changed = dropped = 0

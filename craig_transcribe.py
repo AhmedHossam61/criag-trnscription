@@ -94,6 +94,16 @@ PAD_S = 0.20
 # without touching the latter.
 MIN_PEAK_DBFS = -40.0
 
+# Skip short chunks in which the speech detector (Silero VAD) hears someone
+# talking for less than this share of the clip. Checked against the audio of
+# one 5-minute stretch: real short lines ("RITUAL!", "ايه ده", "يا جدع") were
+# 36-69% speech; lines invented on laughs and breaths were 0-32%, and 0.25
+# removed 4 of 6 of them without losing a real one. Only chunks up to
+# VAD_MAX_CHUNK_S are checked -- every invented line was shorter -- which keeps
+# the check to a minute or two per session on the CPU.
+MIN_SPEECH_RATIO = 0.25
+VAD_MAX_CHUNK_S = 6.0
+
 TOKENS_PER_S = 15
 TOKEN_FLOOR = 24
 TOKEN_CEIL = 256
@@ -1072,7 +1082,7 @@ def refresh_drops(segments: list[Segment]) -> None:
     """
     rescreened = restored = 0
     for seg in segments:
-        if seg.dropped and seg.drop_reason == "too-quiet":
+        if seg.dropped and seg.drop_reason in ("too-quiet", "no-speech"):
             continue
         chunk = Chunk(
             track_index=seg.track_index, speaker=seg.speaker,
@@ -1375,16 +1385,45 @@ def chunk_peak_db(pcm: np.memmap, track: Track, chunk: Chunk) -> float:
     return 20 * np.log10(max(peak, 1) / 32768.0)
 
 
+class SpeechCheck:
+    """
+    Silero VAD (a ~2 MB speech detector, CPU) measuring how much of a clip is
+    actually someone talking. Laughs, breaths and lip smacks are loud enough
+    to pass the level gate, and QwenCleo writes a stock sentence for them.
+    """
+
+    def __init__(self) -> None:
+        import torch
+        from silero_vad import load_silero_vad
+        self.torch = torch
+        self.model = load_silero_vad()
+
+    def speech_ratio(self, audio: np.ndarray, threshold: float = 0.5) -> float:
+        frame = 512  # what silero takes at 16 kHz
+        n = len(audio) // frame
+        if n == 0:
+            return 0.0
+        self.model.reset_states()
+        voiced = 0
+        with self.torch.no_grad():
+            for i in range(n):
+                x = self.torch.from_numpy(np.ascontiguousarray(audio[i * frame:(i + 1) * frame]))
+                voiced += self.model(x, SR).item() >= threshold
+        return voiced / n
+
+
 def plan(root: Path, scratch: Path, limit_s: float | None,
          speaker_map: dict[str, str] | None = None,
          min_peak_db: float = MIN_PEAK_DBFS,
          min_gap_s: float = MIN_GAP_S,
          start_s: float | None = None,
-         ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path], set[str]]:
+         min_speech_ratio: float = MIN_SPEECH_RATIO,
+         ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path], dict[str, str]]:
     """
-    Decode and segment every track. Chunks quieter than min_peak_db are left
-    out of the plan and their keys returned separately, so chunk ids (and
-    resume) are unaffected by the threshold.
+    Decode and segment every track. Chunks quieter than min_peak_db, and short
+    chunks the speech detector hears little speech in, are left out of the
+    plan and returned separately as {key: reason}, so chunk ids (and resume)
+    are unaffected by either threshold.
     """
     tracks = discover_tracks(root)
     if speaker_map:
@@ -1402,7 +1441,8 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
         tracks = kept
     pcm_paths: dict[int, Path] = {}
     plans: dict[int, list[Chunk]] = {}
-    quiet: set[str] = set()
+    skipped: dict[str, str] = {}
+    vad = SpeechCheck() if min_speech_ratio > 0 else None
 
     for track in tracks:
         pcm_path = scratch / f"track{track.index}.wav"
@@ -1418,22 +1458,39 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
             if start_s is not None:
                 chunks = [c for c in chunks if c.start_s >= start_s]
             loud = [c for c in chunks if chunk_peak_db(pcm, track, c) >= min_peak_db]
+            voiced = loud
+            if vad is not None:
+                voiced = [
+                    c for c in loud
+                    if c.duration_s > VAD_MAX_CHUNK_S
+                    or vad.speech_ratio(read_chunk_audio(pcm, track, c)) >= min_speech_ratio
+                ]
         finally:
             close_pcm(pcm)
         loud_keys = {c.key for c in loud}
-        quiet.update(c.key for c in chunks if c.key not in loud_keys)
-        plans[track.index] = loud
+        voiced_keys = {c.key for c in voiced}
+        for c in chunks:
+            if c.key not in loud_keys:
+                skipped[c.key] = "too-quiet"
+            elif c.key not in voiced_keys:
+                skipped[c.key] = "no-speech"
+        plans[track.index] = voiced
 
-        speech = sum(c.duration_s for c in loud)
+        speech = sum(c.duration_s for c in voiced)
         total = len(pcm) / SR
         pct = (100 * speech / total) if total else 0.0
+        notes = []
+        if len(loud) < len(chunks):
+            notes.append(f"{len(chunks) - len(loud)} too quiet")
+        if len(voiced) < len(loud):
+            notes.append(f"{len(loud) - len(voiced)} without speech")
         print(
             f"  track {track.index:>2}  {track.speaker:<24} "
             f"{total / 3600:6.2f}h audio -> {speech / 60:8.2f} min speech "
-            f"({pct:5.1f}%) in {len(loud)} chunks"
-            + (f", {len(chunks) - len(loud)} too quiet" if len(loud) < len(chunks) else "")
+            f"({pct:5.1f}%) in {len(voiced)} chunks"
+            + (", " + ", ".join(notes) if notes else "")
         )
-    return tracks, plans, pcm_paths, quiet
+    return tracks, plans, pcm_paths, skipped
 
 
 def main() -> None:
@@ -1486,6 +1543,15 @@ def main() -> None:
             f"(default {MIN_PEAK_DBFS:g}). These are mic hiss and breathing that "
             f"the model turns into invented sentences. Raise toward -35 for more "
             f"aggressive filtering; -120 disables it."
+        ),
+    )
+    parser.add_argument(
+        "--min-speech-ratio", type=float, default=MIN_SPEECH_RATIO, metavar="R",
+        help=(
+            f"skip chunks up to {VAD_MAX_CHUNK_S:g} s in which the speech detector hears "
+            f"talking for less than this share of the clip (default {MIN_SPEECH_RATIO:g}). "
+            f"Catches laughs and breaths the model writes sentences for. "
+            f"0 disables it; around 0.35 is stricter but may cut real one-word replies."
         ),
     )
     parser.add_argument(
@@ -1598,9 +1664,10 @@ def main() -> None:
 
         print("\nSegmenting tracks (zero-run VAD):")
         t0 = time.time()
-        tracks, plans, pcm_paths, quiet = plan(
+        tracks, plans, pcm_paths, skipped = plan(
             root, scratch, args.limit, speaker_map=speaker_map,
             min_peak_db=args.min_peak_db, min_gap_s=args.min_gap, start_s=args.start,
+            min_speech_ratio=args.min_speech_ratio,
         )
         total_chunks = sum(len(c) for c in plans.values())
         total_speech = sum(c.duration_s for cs in plans.values() for c in cs)
@@ -1631,11 +1698,12 @@ def main() -> None:
         done = load_done(jsonl)
         if done:
             print(f"\nResuming: {len(done)} segments already transcribed.")
-        # Segments transcribed before the level gate existed (or under a lower
-        # threshold) are hidden from the outputs; segments.jsonl keeps them.
+        # Segments transcribed before the level gate or speech check existed
+        # (or under looser thresholds) are hidden from the outputs;
+        # segments.jsonl keeps them.
         for key, seg in done.items():
-            if key in quiet and not seg.dropped:
-                seg.dropped, seg.drop_reason = True, "too-quiet"
+            if key in skipped and not seg.dropped:
+                seg.dropped, seg.drop_reason = True, skipped[key]
 
         segments: list[Segment] = list(done.values())
         pending = [c for cs in plans.values() for c in cs if c.key not in done]
@@ -1670,9 +1738,11 @@ def main() -> None:
         write_outputs(segments, args.outdir, info)
 
         kept = sum(1 for s in segments if not s.dropped)
+        n_quiet = sum(1 for r in skipped.values() if r == "too-quiet")
         print(
-            f"\nDone. {kept} segments kept, {len(segments) - kept} filtered, "
-            f"{len(quiet)} chunks skipped as too quiet (below {args.min_peak_db:g} dBFS)."
+            f"\nDone. {kept} segments kept, {len(segments) - kept} filtered; skipped "
+            f"{n_quiet} chunks as too quiet (below {args.min_peak_db:g} dBFS) and "
+            f"{len(skipped) - n_quiet} with too little speech."
         )
         if failed:
             print(f"  {failed} chunk(s) failed -- re-run the same command to retry them.")

@@ -124,6 +124,7 @@ Folders made before the "whole sentences" change (`out`, `out-AqliOggnsXbo`, `ou
 | `--batch-size` | `16` | Max chunks per GPU batch. |
 | `--beams` | `1` | Beam search. Tested with `4` on 5 minutes checked against the audio: no real gain (12 lines better, 11 worse) and 2 more invented lines, at 2–3× the time. Leave at `1`. |
 | `--start` | none | Start N seconds into the recording, for testing a window (see A.4). |
+| `--min-speech-ratio` | `0.25` | Clips up to 6 s where a speech detector hears talking in less than 25% of the clip are skipped (laughs, breaths, lip smacks the model writes sentences for). `0` turns it off; `0.35` is stricter but may cut real one-word replies. |
 | `--language` | `auto` | `ar` forces Arabic output; `en` forces English. |
 | `--scratch-dir` | system temp | Temporary audio needs about 1 GB per player per 8 hours. Point it at a roomy drive if C: is tight. |
 
@@ -257,6 +258,58 @@ Speed: about 15 minutes per hour of recording on the RTX 3050.
 
 ---
 
+## Part C: fix misheard words with Gemini (`llm_correct.py`)
+
+The speech model gets names, D&D terms and fast slang wrong: "religion check" comes out as "الريجيت شيك" and "Arnok" as "ارضك". After transcribing (Part A or B), this sends Gemini **the audio** of each window together with the transcript lines and your glossary. Gemini fixes what it hears is wrong, and marks lines where nobody actually spoke.
+
+### C.1 Setup (once)
+- **API keys:** put them in `.env` next to the scripts:
+  ```
+  GEMINI_API=your-first-key
+  GEMINI_API_2=your-second-key
+  ```
+  Get keys at https://aistudio.google.com/apikey. When one key runs out of quota, the next takes over. `.env` is kept out of git.
+- **Glossary:** edit `glossary.txt` with your campaign's names and words (NPCs, places, items, how names get misheard). It is already seeded with what we know. Names matter most; Gemini knows the D&D rules already.
+
+### C.2 Run it
+
+```powershell
+# Craig session: pass the same zip and speaker map
+python llm_correct.py -o out-v3owGZBtlLQA --audio "craig-v3owGZBtlLQA-kLUAHXQ8yB5gQu8PPAhxF3gfZdDmYF.sesx.zip" --speaker-map speaker_map.txt
+
+# Phone session: pass the recording
+python llm_correct.py -o out-phone-session1 --audio "session.m4a"
+```
+
+- **One call per 30 minutes of session.** A 6-hour session needs 12 calls; the free tier gives about 20 per key per day.
+- **Progress is saved after every call.** If the daily limit is reached, run the same command the next day and it continues.
+- **Try one call first:** add `--max-calls 1`. To see the plan without spending calls: `--dry-run`.
+
+### C.3 What you get
+| File | What it is |
+|---|---|
+| `transcript.txt` / `.srt` / `.json` | Now the **corrected** version. In `.json`, changed lines keep the old text in `original_text`. |
+| `transcript-uncorrected.txt` | The transcript before correction, to compare. |
+| `corrections.json` | Every change Gemini made (`text`, or `drop` for "nobody spoke"), with the old text in `was`. |
+| `dropped.txt` | Includes the lines Gemini marked as no speech (`llm-no-speech`). |
+
+`segments.jsonl` is never changed, so nothing is lost:
+- `--rewrite-outputs` (Part A/B) keeps the corrections.
+- `python llm_correct.py -o FOLDER --undo` removes them all.
+- `--redo` throws them away and corrects again, e.g. after improving the glossary.
+
+### C.4 Options
+| Option | Default | Meaning |
+|---|---|---|
+| `--glossary` | `glossary.txt` | Your names and terms. |
+| `--window-min` | `30` | Minutes of session per call. Larger means fewer calls, but Gemini may skim. |
+| `--model` | `gemini-2.5-flash` | Which Gemini model. `--list-models` shows what your key can use. |
+| `--daily-limit` | `20` | Calls per key per day; the script stops before Google does. |
+| `--max-calls` | none | Stop after N calls in this run. |
+| Without `--audio` | | Text-only mode: Gemini only fixes obvious things (glossary names, English spelled in Arabic letters). Much weaker; use the audio. |
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -268,6 +321,8 @@ Speed: about 15 minutes per hour of recording on the RTX 3050.
 | Very slow, GPU memory full | Windows spills VRAM into system RAM instead of crashing. Close other GPU apps (browser, games), or use `--batch-seconds 60`. |
 | `pyannote unavailable (GatedRepoError ...)` | No token, or the model's conditions weren't accepted; see B.4. The script falls back to the built-in detector meanwhile. |
 | Invented lines ("web development", "بحبك ... بحبني") | Raise `--min-peak-db` (e.g. `-35`) in a new folder. New filter patterns can be applied to old folders with `--rewrite-outputs`. |
+| `llm_correct.py`: "out of quota" on every key | The free daily limit is used up. Run the same command tomorrow; finished windows are kept. |
+| `llm_correct.py`: a window "failed" | Usually temporary (server busy). Run the same command again; only unfinished windows are sent. |
 | Wrong name on a phone speaker | Listen to `speaker_samples\`, then fix it with B.3. Enrolling more Craig sessions (B.1) improves future matches. |
 
 ---
@@ -285,4 +340,7 @@ python craig_transcribe.py --rewrite-outputs -o out-SESSION --speaker-map speake
 python phone_transcribe.py --enroll "CRAIG.zip" --speaker-map speaker_map.txt   # add voices (optional)
 python phone_transcribe.py "SESSION.m4a" -o out-phone-SESSION --num-speakers 5
 python phone_transcribe.py --rewrite-outputs -o out-phone-SESSION --speaker-map phone_names.txt
+
+# Gemini correction (after either of the above; keys in .env)
+python llm_correct.py -o out-SESSION --audio "SESSION.zip" --speaker-map speaker_map.txt
 ```

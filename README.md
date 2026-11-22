@@ -94,6 +94,8 @@ In a test on a simulated phone mix of a real session, the built-in detector cred
 |---|---|
 | `craig_transcribe.py` | Transcribe a Craig zip |
 | `phone_transcribe.py` | Transcribe one mixed recording; `--enroll` builds voice profiles |
+| `llm_correct.py` | Optional pass: Gemini listens to the audio and fixes misheard names, terms and slang |
+| `glossary.txt` | Campaign names and terms for the Gemini pass |
 | `speaker_map.txt` | Discord username → character name (`SKIP` for bots) |
 | `voices.npz` | Voice profiles of the players (not in git: personal data) |
 | `GUIDE.md` | How to run everything, options, troubleshooting |

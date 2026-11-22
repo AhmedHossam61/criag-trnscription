@@ -220,3 +220,6 @@ __marimo__/
 
 # Voice profiles of real people (phone_transcribe.py --enroll)
 voices.npz
+
+# Gemini correction pass: daily call counts per key (no keys stored)
+.gemini_usage.json

@@ -38,3 +38,6 @@ huggingface_hub
 # Neither changes the torch install.
 pyannote.audio>=4.0
 silero-vad>=6.0
+
+# llm_correct.py only (Gemini correction pass).
+google-genai>=1.0
