@@ -1,0 +1,8 @@
+{
+ "window_s": 1800.0,
+ "mode": "audio",
+ "model": "gemini-2.5-flash",
+ "done": [
+  0
+ ]
+}

@@ -1,0 +1,70 @@
+[00:08:00.999] Vaylor (token-loop): انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا بحبك بس انا ب
+[00:16:07.319] Vaylor (boilerplate-hallucination): انا بحبك انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني ا
+[00:33:26.183] Kael (ngram-loop): Okay, جايبني جايبني يا موميتي هي فين هي فين هي فين هي فين هي فين كاست على نفسي بالمش آرمر اوكي انا كنت ببدا بحاجه بسيطه حلوه تتبني
+[00:40:27.959] Dungeon Master (ngram-loop): سيبوا انا هعدلوا سيبوا انا هعدلوا سيبوا انا هعدلوا
+[00:45:34.140] Dungeon Master (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك أو مش بحبك
+[00:45:50.204] Thalion (boilerplate-hallucination): يا جماعة احنا بنعمل project جديد في الـ web design وانا بعمله
+[00:46:24.264] Kael (boilerplate-hallucination): بصراحة أنا مش متأكدة إن أنا بحبك
+[00:46:56.044] Kael (boilerplate-hallucination): بصوا بقى احنا بنعمل project جديد في الـ coding
+[00:47:57.359] Thalion (token-loop): بالغلط بالغلط بالغلط بالغلط بالغلط بالغلط
+[00:52:38.179] Dungeon Master (token-loop): so as you are starting i want you two to do i want you to start fine you are starting fine you are starting i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you two to do i want you
+[00:59:08.523] Thalion (ngram-loop): يلا يلا يلا يلا بينا نتطبق يلا يلا
+[01:03:05.943] Dungeon Master (ngram-loop): صل على النبي صل على النبي صل على النبي يا ابني
+[01:03:26.645] Kael (ngram-loop): لا مش ده يا استنى استنى كاست كاست كاست كاست كاست كاست كاست
+[01:05:16.844] Dungeon Master (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[01:06:12.943] Arnok (boilerplate-hallucination): انا بحبك انت بحبني
+[01:06:19.444] Thalion (ngram-loop): لا لا لا لا يا عم فين عشان هما عماله يقولوا لا لا لا لا لا لا لا لا ماشي طب انا وراك بقى شفت انت كستها فين انا وراك بقى ده تعبيت قوي بقى كستها كستها
+[01:10:28.404] Thalion (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[01:11:17.464] Thalion (token-loop): مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف ايه ده، مش عارف
+[01:24:42.784] Thalion (llm-no-speech): طب وبيت الحاجات اللي انا بعتها لك يا في الصورة في الصورة
+[01:24:50.279] Kael (llm-no-speech): انت انا بتكلم عن الscrolls
+[01:31:32.963] Dungeon Master (llm-no-speech): ايه ده
+[01:32:27.104] Kael (llm-no-speech): تشت
+[01:38:00.804] Dungeon Master (llm-no-speech): ما ما
+[01:42:46.123] Dungeon Master (llm-no-speech): ازاي يا حسوب
+[01:46:18.144] Dungeon Master (llm-no-speech): يا رب عايز
+[01:54:49.823] Dungeon Master (llm-no-speech): مش عارف ايه
+[01:58:12.339] Kael (llm-no-speech): بعت صورة واضحة للبتاع اللي كنت
+[02:04:43.759] Kael (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[02:29:22.283] Thalion (boilerplate-hallucination): انا بحبك انت بحبني
+[02:37:59.980] Dungeon Master (token-loop): ايه ده ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه ده انت هابيني ايه د
+[02:55:14.020] Arnok (boilerplate-hallucination): 嗯
+[03:18:28.419] Arnok (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[03:33:11.199] Dungeon Master (ngram-loop): pick a fucking lane, pick a fucking lane, pick a fucking lane
+[03:35:43.015] Kael (llm-no-speech): انا انا برجع لورا عامه او بيموت بروتوكول
+[03:46:48.143] Arnok (boilerplate-hallucination): انا بحبك يا حبيبي
+[03:51:12.404] Dungeon Master (boilerplate-hallucination): انا بحبك انت بحبني انت ب
+[04:16:41.764] Arnok (token-loop): بصوا بقى احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده احنا بنعمل ايه ده ا
+[04:16:49.224] Dungeon Master (ngram-loop): اتفضل يا عم نور اتفضل يا عم نور يا عم اتفضل يا عم نور
+[04:17:26.243] Dungeon Master (token-loop): يا سيدي والله انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد يا سيدي انا بحبك بجد
+[04:17:52.099] Kael (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[04:20:25.403] Thalion (boilerplate-hallucination): بصراحة انا مش عارف اعمل ايه
+[04:37:02.404] Arnok (boilerplate-hallucination): 你最近啥呀？
+[04:37:37.343] Arnok (llm-no-speech): يا جماعة انا قاعد في الـ cafe وانا بفكر في حاجات كتير
+[04:38:12.784] Arnok (token-loop): يلا يا جماعة، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا بتعملوا ايه في الـ game دي، انتوا
+[04:38:28.844] Arnok (token-loop): يا جدعان انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل project بس انا مش عارف ايه الproject ده انا عايز اعمل
+[04:38:48.864] Arnok (llm-no-speech): انا بقولك انا
+[04:39:07.305] Arnok (boilerplate-hallucination): 你
+[04:39:25.143] Arnok (llm-no-speech): يا جدعان انا بحبك انت بحب
+[04:40:06.663] Arnok (boilerplate-hallucination): يا جماعة احنا بنعمل project في ال engineering college في ال Cairo University
+[04:41:40.205] Dungeon Master (token-loop): I will give an advice, I will give one piece of advice, I will give you a message, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice, I will give you an advice
+[04:47:58.963] Arnok (token-loop): انا عايز اعمل video بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بتاعي بتاع الـ YouTube بت
+[05:17:15.244] Arnok (ngram-loop): انا هعمل انا هعمل انا هعمل حاجه تانيه
+[05:21:56.599] Thalion (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[05:29:06.044] Thalion (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[05:32:42.724] Thalion (ngram-loop): يا رب يا رب يا رب يا رب لازم تعمل wisdom wisdom check مرة الجاية وتصحينا كلنا
+[05:33:02.984] Vaylor (llm-no-speech): this is bullshit me
+[05:34:35.524] Kael (boilerplate-hallucination): يا جدعان انا بحبك انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت بحبني انت ب
+[05:36:32.719] Arnok (ngram-loop): خد الشرد خد الشرد خد الشرد
+[05:37:50.979] Dungeon Master (boilerplate-hallucination): انا بحبك انت بحبني ا
+[05:39:48.839] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:41:28.139] Thalion (boilerplate-hallucination): انا بحب اعمل ازاي
+[05:42:38.089] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:43:05.639] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:44:21.719] Dungeon Master (llm-no-speech): هو لسه ما اتغيرش وهيتغير خد
+[05:45:04.319] Kael (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
+[05:49:29.939] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:54:13.559] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:54:39.509] Thalion (boilerplate-hallucination): انا بحبك انت بحبني انت بحب
+[05:55:27.709] Thalion (boilerplate-hallucination): انا بحبك يا حبيبي
+[05:59:41.064] Thalion (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك

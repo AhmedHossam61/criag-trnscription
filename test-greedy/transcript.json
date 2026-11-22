@@ -4,7 +4,8 @@
     "Guild": "Dark age of الزريبة (1094307555821490226)",
     "Channel": "DND Room (1385396000285397042)",
     "Requester": "hazemonsif#0 (303886467716087810)",
-    "Start time": "2026-11-21T17:15:12.168Z"
+    "Start time": "2026-11-21T17:15:12.168Z",
+    "Min gap s": "1.5"
   },
   "segments": [
     {
@@ -16,7 +17,8 @@
       "track_index": 4,
       "chunk_id": 450,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
@@ -27,7 +29,8 @@
       "track_index": 1,
       "chunk_id": 675,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
@@ -38,7 +41,8 @@
       "track_index": 3,
       "chunk_id": 1002,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
@@ -49,51 +53,56 @@
       "track_index": 1,
       "chunk_id": 676,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
       "start_s": 11717.459,
       "end_s": 11723.804,
-      "text": "اه انا معايا علناش حاجه بابا يعني حطينا ميه في البوله",
+      "text": "اه انا نوعا ما يعني معملناش حاجة حطينا مية في البولة",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 451,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اه انا معايا علناش حاجه بابا يعني حطينا ميه في البوله"
     },
     {
       "speaker": "Kael",
       "start_s": 11721.003,
       "end_s": 11725.604,
-      "text": "ولا حصلت ايه ما قعدش عليه",
+      "text": "ايه اللي حصل طيب؟",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 677,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ولا حصلت ايه ما قعدش عليه"
     },
     {
       "speaker": "Vaylor",
       "start_s": 11726.619,
       "end_s": 11729.565,
-      "text": "قال لي لا اكيد مش طالبين بلا sacrifice",
+      "text": "قال لي لا اكيد مش طالبين بلاد sacrifice",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 452,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "قال لي لا اكيد مش طالبين بلا sacrifice"
     },
     {
       "speaker": "Kael",
       "start_s": 11729.839,
       "end_s": 11732.384,
-      "text": "بس مفتشناش في أي حاجة يعني",
+      "text": "بس ما طلعلناش بأي حاجة يعني",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 678,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "بس مفتشناش في أي حاجة يعني"
     },
     {
       "speaker": "Dungeon Master",
@@ -104,7 +113,8 @@
       "track_index": 3,
       "chunk_id": 1004,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
@@ -115,7 +125,8 @@
       "track_index": 3,
       "chunk_id": 1005,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
@@ -126,18 +137,20 @@
       "track_index": 1,
       "chunk_id": 679,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11740.979,
       "end_s": 11756.864,
-      "text": "اه لا هو كان بيقول ان انت كنت حاسس بسحر في كل حته بس ما كانش فيه اي حته مميزه فكان هيكمل كان هيقول لو لو البول ده requires blood sacrifice الماجيك كان هيبقى متجمع عنده اللي كان هيقوله",
+      "text": "اه لا هو كان بيقول ان انت كنت حاسس بسحر في كل حته بس ما كانش فيه اي حته مميزه فكان هيكمل كان هيقول لو لو البول ده requires a blood sacrifice الماجيك كان هيبقى متجمع عنده اللي كان هيقوله",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1006,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اه لا هو كان بيقول ان انت كنت حاسس بسحر في كل حته بس ما كانش فيه اي حته مميزه فكان هيكمل كان هيقول لو لو البول ده requires blood sacrifice الماجيك كان هيبقى متجمع عنده اللي كان هيقوله"
     },
     {
       "speaker": "Kael",
@@ -148,7 +161,8 @@
       "track_index": 1,
       "chunk_id": 680,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
@@ -159,7 +173,8 @@
       "track_index": 4,
       "chunk_id": 453,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Thalion",
@@ -170,7 +185,8 @@
       "track_index": 2,
       "chunk_id": 710,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Thalion",
@@ -181,29 +197,32 @@
       "track_index": 2,
       "chunk_id": 711,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11765.863,
       "end_s": 11771.304,
-      "text": "ده مجد الوقت وبكره احنا الفحله",
+      "text": "ده ناموا كده دلوقتي وبكره يصحوا",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1007,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ده مجد الوقت وبكره احنا الفحله"
     },
     {
       "speaker": "Kael",
       "start_s": 11768.839,
       "end_s": 11772.804,
-      "text": "انا هكست اكست الارم على ال",
+      "text": "انا هكست هكست alarm على ال",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 681,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "انا هكست اكست الارم على ال"
     },
     {
       "speaker": "Vaylor",
@@ -214,150 +233,188 @@
       "track_index": 4,
       "chunk_id": 454,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
       "start_s": 11774.123,
       "end_s": 11778.604,
-      "text": "على على ال ال اسمه ايه الalter دوت",
+      "text": "على على ال ال اسمه ايه الaltar دوت",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 682,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "على على ال ال اسمه ايه الalter دوت"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11778.259,
       "end_s": 11780.364,
-      "text": "جبتها منين ال alarm master",
+      "text": "جبتها منين الalarm يا اسطى",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1008,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "جبتها منين ال alarm master"
     },
     {
       "speaker": "Kael",
       "start_s": 11780.644,
       "end_s": 11783.423,
-      "text": "اشتريتها منك قسطه من نص ساعه",
+      "text": "اشتريتها منك يا اسطى",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 683,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اشتريتها منك قسطه من نص ساعه"
+    },
+    {
+      "speaker": "Dungeon Master",
+      "start_s": 11782.024,
+      "end_s": 11797.704,
+      "text": "ضفتها امتى؟ ضفتها امتى؟ هل انت نمت؟ هل انت ritual؟ هل انت ritual؟ أيوة يعني ritual أعملها بريبير؟",
+      "language": "Arabic",
+      "track_index": 3,
+      "chunk_id": 1009,
+      "dropped": false,
+      "drop_reason": "",
+      "original_text": "دفتها امتى اه دفتها امتى هو انت انت هل انت هل انت نمت علشان انت يعني ايه rich boy يعني ايه rich boy اوي انا rich boy اعملها بريبير"
     },
     {
       "speaker": "Kael",
       "start_s": 11785.183,
       "end_s": 11787.884,
-      "text": "بفطر امتى ايه هي ريش ولا صاحبي",
+      "text": "ضفتها امتى ايه هي ritual ولا صاحبي",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 684,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "بفطر امتى ايه هي ريش ولا صاحبي"
+    },
+    {
+      "speaker": "Kael",
+      "start_s": 11789.159,
+      "end_s": 11800.325,
+      "text": "ritual ritual يعني ايه ده يعني مش ritual يا حبيبي مش بعملها prepair",
+      "language": "Arabic",
+      "track_index": 1,
+      "chunk_id": 685,
+      "dropped": false,
+      "drop_reason": "",
+      "original_text": "يا ريت شوال ريت شوال يعني ايه ده يعني مش ريت شوال يا حبيبي مش بعملها prepair"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11802.219,
       "end_s": 11804.084,
-      "text": "دي فيتش انا عندك يعني",
+      "text": "دي feature عندك يعني",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1010,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "دي فيتش انا عندك يعني"
     },
     {
       "speaker": "Kael",
       "start_s": 11803.803,
       "end_s": 11808.844,
-      "text": "عليه اسمارتش ولا ديبت يا ريك احنا في station 19 يا اسطى",
+      "text": "أيوة اسمها Ritual Adept يا ريكا احنا في session 19 يا اسطى",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 686,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "عليه اسمارتش ولا ديبت يا ريك احنا في station 19 يا اسطى"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11806.68,
       "end_s": 11810.485,
-      "text": "يعني انت ritual قدبت",
+      "text": "يعني انت Ritual Adept",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1011,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "يعني انت ritual قدبت"
     },
     {
       "speaker": "Kael",
       "start_s": 11810.064,
       "end_s": 11812.644,
-      "text": "ايوه اسطى انا عندي added ritual اسطى",
+      "text": "ايوه يا اسطى انا عندي adept ritual يا اسطى",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 687,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ايوه اسطى انا عندي added ritual اسطى"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11812.704,
       "end_s": 11820.144,
-      "text": "ماشي طب لما تعمل حاجة زي كده قول لي انا هستخدم ال virtual library بتاعتها عشان اعمل كذا because i don't remember التوحيد ايه دايما",
+      "text": "ماشي طب لما تعمل حاجة زي كده قول لي انا هستخدم الRitual Adept بتاعتي عشان اعمل كذا because I don't remember انتوا واخدين ايه دايما",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1012,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ماشي طب لما تعمل حاجة زي كده قول لي انا هستخدم ال virtual library بتاعتها عشان اعمل كذا because i don't remember التوحيد ايه دايما"
     },
     {
       "speaker": "Kael",
       "start_s": 11819.544,
       "end_s": 11828.184,
-      "text": "ماشي اوكي انت ما ادتينيش فرصه حتى خلت كده اني على طول",
+      "text": "ماشي اوكي انت ما ادتنيش فرصة حتى انت قتلتني على طول",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 688,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ماشي اوكي انت ما ادتينيش فرصه حتى خلت كده اني على طول"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11824.119,
       "end_s": 11832.224,
-      "text": "لا انت انت ما كنتش هتقول انت ما كنتش هتقول بتحورها",
+      "text": "انت ما كنتش هتقول انت ما كنتش هتقول ما تحورناش",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1013,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "لا انت انت ما كنتش هتقول انت ما كنتش هتقول بتحورها"
     },
     {
       "speaker": "Arnok",
       "start_s": 11825.885,
       "end_s": 11827.305,
-      "text": "ريت شو اه",
+      "text": "Ritual",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 409,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ريت شو اه"
     },
     {
       "speaker": "Kael",
       "start_s": 11830.987,
       "end_s": 11833.724,
-      "text": "برضه يا اخي انت شايل ايه",
+      "text": "ماشي ماشي يلا Ritual",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 689,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "برضه يا اخي انت شايل ايه"
     },
     {
       "speaker": "Dungeon Master",
@@ -368,18 +425,20 @@
       "track_index": 3,
       "chunk_id": 1014,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
       "start_s": 11837.123,
       "end_s": 11839.444,
-      "text": "يعني هتاخد 11 دقيقة مفرط",
+      "text": "يعني هتاخد 11 دقيقة المفروض",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 690,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "يعني هتاخد 11 دقيقة مفرط"
     },
     {
       "speaker": "Dungeon Master",
@@ -390,51 +449,56 @@
       "track_index": 3,
       "chunk_id": 1015,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
       "start_s": 11846.059,
       "end_s": 11858.485,
-      "text": "وانا اريح كده وقبل ما اقفل عيني انا بفكر هل بما ان ده The Nihilist Beyond وهو كائن لوف",
+      "text": "وانا أريح كده وقبل ما أقفل عيني أنا بفكر هل بما إن ده The Nameless Beyond وهو كائن",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 455,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "وانا اريح كده وقبل ما اقفل عيني انا بفكر هل بما ان ده The Nihilist Beyond وهو كائن لوف"
     },
     {
       "speaker": "Arnok",
       "start_s": 11856.643,
       "end_s": 11863.764,
-      "text": "لا مدمن هو بيقولك نام بيقولك الدنيا bad جد عشان تنام اصلا عشان يقولك ايه في الحلم",
+      "text": "لا مدمن هو بيقولك نام بيقولك الدنيا بقت جت عشان تنام اصلا عشان يقولك ايه في الحلم",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 410,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "لا مدمن هو بيقولك نام بيقولك الدنيا bad جد عشان تنام اصلا عشان يقولك ايه في الحلم"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11862.003,
       "end_s": 11866.279,
-      "text": "انا بس انا بس",
+      "text": "انا بس",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1017,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "انا بس انا بس"
     },
     {
       "speaker": "Vaylor",
       "start_s": 11863.959,
       "end_s": 11872.744,
-      "text": "ما انا متاكد ان ده حسب بس برضه ام ترينج تو جيس يعني ان احنا جربنا عمك الصمك بقى مط",
+      "text": "ما انا متاكد ان ده هيحصل بس برضه I'm trying to guess يعني احنا جربنا عمك الصمك بقى مط",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 456,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "ما انا متاكد ان ده حسب بس برضه ام ترينج تو جيس يعني ان احنا جربنا عمك الصمك بقى مط"
     },
     {
       "speaker": "Thalion",
@@ -445,7 +509,8 @@
       "track_index": 2,
       "chunk_id": 712,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Arnok",
@@ -456,7 +521,8 @@
       "track_index": 5,
       "chunk_id": 411,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
@@ -467,7 +533,8 @@
       "track_index": 1,
       "chunk_id": 691,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
@@ -478,18 +545,20 @@
       "track_index": 3,
       "chunk_id": 1018,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
       "start_s": 11874.824,
       "end_s": 11879.244,
-      "text": "غالبًا احنا هنحتاج ضحى بحاجة سحرية يعني بس it's okay",
+      "text": "غالبا احنا هنحتاج نضحي بحاجة سحرية يعني بس it's okay",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 457,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "غالبًا احنا هنحتاج ضحى بحاجة سحرية يعني بس it's okay"
     },
     {
       "speaker": "Kael",
@@ -500,18 +569,20 @@
       "track_index": 1,
       "chunk_id": 692,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
       "start_s": 11882.199,
       "end_s": 11884.584,
-      "text": "امتى قتل المتعة على",
+      "text": "أنت يالا قاتل المتعة يالا",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 458,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "امتى قتل المتعة على"
     },
     {
       "speaker": "Arnok",
@@ -522,7 +593,8 @@
       "track_index": 5,
       "chunk_id": 412,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
@@ -533,40 +605,44 @@
       "track_index": 1,
       "chunk_id": 693,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
       "start_s": 11891.299,
       "end_s": 11894.064,
-      "text": "يا شيخ الله ناموا كل نام لنا",
+      "text": "يا شيخ يلا ناموا كله ينام نمنا",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 694,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "يا شيخ الله ناموا كل نام لنا"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11895.243,
       "end_s": 11902.024,
-      "text": "اللولنجر ستار جاله كله راجع لسبيل سلطة تاتو",
+      "text": "الlong rest على الرجالة كله يرجع الspell slots بتاعته",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1020,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اللولنجر ستار جاله كله راجع لسبيل سلطة تاتو"
     },
     {
       "speaker": "Arnok",
       "start_s": 11901.823,
       "end_s": 11905.004,
-      "text": "انا بحاول اصلي ايوه وهم نايمين في نص الالتر",
+      "text": "انا بحاول اصلي ايوه وهم نايمين في نص الaltar",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 413,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "انا بحاول اصلي ايوه وهم نايمين في نص الالتر"
     },
     {
       "speaker": "Kael",
@@ -577,84 +653,92 @@
       "track_index": 1,
       "chunk_id": 695,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Vaylor",
       "start_s": 11906.459,
       "end_s": 11910.284,
-      "text": "يا ابن المتنكة يا ابن المتنكة",
+      "text": "يا ابن المتناكة يا ابن المتناكة",
       "language": "Arabic",
       "track_index": 4,
       "chunk_id": 459,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "يا ابن المتنكة يا ابن المتنكة"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11908.319,
       "end_s": 11912.384,
-      "text": "دي الريجيت شيك كده على ارنق",
+      "text": "دي religion check كده على Arnok",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1021,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "دي الريجيت شيك كده على ارنق"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11915.359,
       "end_s": 11919.124,
-      "text": "عايز تقول ايه على ارضك",
+      "text": "عايز تقول ايه يا Arnok",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1022,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "عايز تقول ايه على ارضك"
     },
     {
       "speaker": "Arnok",
       "start_s": 11921.344,
       "end_s": 11928.164,
-      "text": "بص انا بقى عشان ايه",
+      "text": "استنى استنى بقى عشان ايه",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 415,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "بص انا بقى عشان ايه"
     },
     {
       "speaker": "Arnok",
       "start_s": 11931.239,
       "end_s": 11933.044,
-      "text": "النيكو كيك بقى",
+      "text": "النك والكيك بقى",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 416,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "النيكو كيك بقى"
     },
     {
       "speaker": "Dungeon Master",
       "start_s": 11933.624,
       "end_s": 11937.644,
-      "text": "هتقول كده هتروح للدكتور تقول له كده",
+      "text": "هتقول كده هتروح للdeity تقول له كده",
       "language": "Arabic",
       "track_index": 3,
       "chunk_id": 1024,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "هتقول كده هتروح للدكتور تقول له كده"
     },
     {
       "speaker": "Arnok",
       "start_s": 11934.814,
       "end_s": 11940.604,
-      "text": "اه لا عشان الكيك والنكد بقى استنى",
+      "text": "اه لا عشان الكيك والنك بقى استنى",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 417,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اه لا عشان الكيك والنكد بقى استنى"
     },
     {
       "speaker": "Kael",
@@ -665,18 +749,20 @@
       "track_index": 1,
       "chunk_id": 696,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Arnok",
       "start_s": 11943.004,
       "end_s": 11964.854,
-      "text": "اه انا مش عارف مين هيسمع صوتي ولا عارف مين لا هتقول لي اه لا اللي كسبنا خدش في اه انا مش عارف فين",
+      "text": "اه انا مش عارف مين هيسمع صوتي ولا عارف مين لا هتقولي اه لا اللي كسبنا خش في",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 418,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "اه انا مش عارف مين هيسمع صوتي ولا عارف مين لا هتقول لي اه لا اللي كسبنا خدش في اه انا مش عارف فين"
     },
     {
       "speaker": "Dungeon Master",
@@ -687,18 +773,20 @@
       "track_index": 3,
       "chunk_id": 1025,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
       "start_s": 11958.124,
       "end_s": 11960.219,
-      "text": "كمل بس كمل كمل",
+      "text": "كمل كمل",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 697,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "كمل بس كمل كمل"
     },
     {
       "speaker": "Dungeon Master",
@@ -709,29 +797,32 @@
       "track_index": 3,
       "chunk_id": 1026,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Kael",
       "start_s": 11963.124,
       "end_s": 11964.923,
-      "text": "طيب اسمح صوتك على فكرة",
+      "text": "Kael سامع صوتك على فكرة",
       "language": "Arabic",
       "track_index": 1,
       "chunk_id": 698,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "طيب اسمح صوتك على فكرة"
     },
     {
       "speaker": "Arnok",
       "start_s": 11964.854,
       "end_s": 11988.964,
-      "text": "هيسمع صوتي مش عارف مين هيرد عليا بس انا قعدت كتير قوي بحارب واتقلت ناس كتير قوي وليه من اللي فاتوا اتعلمت ان مش دايما القوه والجسم",
+      "text": "هيسمع صوتي مش عارف مين هيرد عليا ايوه بس انا قعدت كتير قوي بحارب وقتلت ناس كتير قوي واليومين اللي فاتوا اتعلمت ان مش دايما القوة والجسم",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 419,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "هيسمع صوتي مش عارف مين هيرد عليا بس انا قعدت كتير قوي بحارب واتقلت ناس كتير قوي وليه من اللي فاتوا اتعلمت ان مش دايما القوه والجسم"
     },
     {
       "speaker": "Dungeon Master",
@@ -742,7 +833,8 @@
       "track_index": 3,
       "chunk_id": 1027,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
@@ -753,7 +845,8 @@
       "track_index": 3,
       "chunk_id": 1028,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Dungeon Master",
@@ -764,18 +857,20 @@
       "track_index": 3,
       "chunk_id": 1029,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": ""
     },
     {
       "speaker": "Arnok",
       "start_s": 11990.243,
       "end_s": 11996.524,
-      "text": "هما اللي كل حاجة انك شفت ان معايا ناس انا خايف عشانهم",
+      "text": "هما اللي كل حاجة انا اكتشفت ان معايا ناس انا خايف عشانهم",
       "language": "Arabic",
       "track_index": 5,
       "chunk_id": 420,
       "dropped": false,
-      "drop_reason": ""
+      "drop_reason": "",
+      "original_text": "هما اللي كل حاجة انك شفت ان معايا ناس انا خايف عشانهم"
     }
   ]
 }

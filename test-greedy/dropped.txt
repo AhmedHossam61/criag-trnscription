@@ -1,5 +1,3 @@
 [03:15:21.884] Dungeon Master (boilerplate-hallucination): انا بحب اعمل ازاي اعمل از
-[03:16:22.024] Dungeon Master (ngram-loop): دفتها امتى اه دفتها امتى هو انت انت هل انت هل انت نمت علشان انت يعني ايه rich boy يعني ايه rich boy اوي انا rich boy اعملها بريبير
-[03:16:29.159] Kael (ngram-loop): يا ريت شوال ريت شوال يعني ايه ده يعني مش ريت شوال يا حبيبي مش بعملها prepair
 [03:18:28.419] Arnok (boilerplate-hallucination): بصراحة أنا مش متأكد إن أنا بحبك
 [03:18:43.019] Dungeon Master (boilerplate-hallucination): انا بحب اعمل ازاي

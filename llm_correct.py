@@ -166,8 +166,7 @@ class KeyPool:
             if key in self.exhausted or usage.get(fingerprint(key), 0) >= self.daily_limit:
                 continue
             if key not in self.clients:
-                from google import genai
-                self.clients[key] = genai.Client(api_key=key)
+                self.clients[key] = make_client(key)
             return f"key {i + 1}", self.clients[key]
         return None
 
@@ -245,6 +244,14 @@ class AudioSource:
 # ---------------------------------------------------------------------------
 # Gemini
 # ---------------------------------------------------------------------------
+
+def make_client(key: str):
+    from google import genai
+    from google.genai import types
+    # The SDK defaults to API v1, which rejects system instructions
+    # ("Developer instruction is not enabled for api version v1").
+    return genai.Client(api_key=key, http_options=types.HttpOptions(api_version="v1beta"))
+
 
 def require_keys(cli_key: str | None) -> list[str]:
     keys = api_keys(cli_key)
@@ -379,8 +386,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.list_models:
-        from google import genai
-        client = genai.Client(api_key=require_keys(args.api_key)[0])
+        client = make_client(require_keys(args.api_key)[0])
         for m in client.models.list():
             if "generateContent" in (getattr(m, "supported_actions", None) or []):
                 print(m.name.removeprefix("models/"))
@@ -497,7 +503,16 @@ def main() -> None:
                         print(f"{key_label} is out of quota; trying the next key.")
                         pool.mark_exhausted(key_label)
                         continue
-                    print(f"failed ({type(exc).__name__}: {str(exc)[:200]}); will retry on re-run")
+                    print(f"failed.\n    {type(exc).__name__}: {str(exc)[:600]}")
+                    code = getattr(exc, "code", None)
+                    if isinstance(code, int) and 400 <= code < 500:
+                        # Wrong model name, bad key, rejected request: every
+                        # window would fail the same way, so don't spend more calls.
+                        print("    This error won't go away by retrying; stopping. "
+                              "Check --model (see --list-models) and the API key.")
+                        out_of_calls = True
+                    else:
+                        print("    Probably temporary; this window will be retried on re-run.")
                     break
             if fixes is None:
                 if out_of_calls:
@@ -526,8 +541,13 @@ def main() -> None:
 
     rewrite(outdir, segments, info)
     remaining = len([w for w, _ in windows if w not in done])
-    print(f"\n{len(corrections)} correction(s) in {corrections_path}.")
-    print(f"transcript.txt is corrected; transcript-uncorrected.txt is the original.")
+    if corrections:
+        print(f"\n{len(corrections)} correction(s) in {corrections_path}.")
+        print("transcript.txt is corrected; transcript-uncorrected.txt is the original.")
+    elif done:
+        print("\nGemini found nothing to correct.")
+    else:
+        print("\nNo corrections yet -- no window was completed (see the error above).")
     if remaining:
         print(f"{remaining} window(s) left -- run the same command again (tomorrow if the "
               f"daily limit is reached) to continue.")
