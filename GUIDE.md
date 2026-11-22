@@ -92,7 +92,12 @@ python craig_transcribe.py "session.zip" -o test-out --speaker-map speaker_map.t
 
 # Just show how much speech there is per player; no GPU
 python craig_transcribe.py "session.zip" -o test-out --speaker-map speaker_map.txt --dry-run
+
+# A window in the middle: 03:15:00 to 03:20:00 (seconds = h*3600 + m*60)
+python craig_transcribe.py "session.zip" -o test-window --speaker-map speaker_map.txt --start 11700 --limit 12000
 ```
+
+To compare settings, run the same window into a separate folder per setting and read the two `transcript.txt` files side by side.
 
 ### A.5 Re-write the transcript without re-transcribing
 Use this after editing `speaker_map.txt`, or after the hallucination filters are updated:
@@ -117,6 +122,8 @@ Folders made before the "whole sentences" change (`out`, `out-AqliOggnsXbo`, `ou
 | `--min-gap` | `1.5` | Pause length (seconds) that splits a player's speech. Higher gives longer lines. |
 | `--batch-seconds` | `120` | Lower it (e.g. `60`) if you get out-of-memory errors or the run is very slow. |
 | `--batch-size` | `16` | Max chunks per GPU batch. |
+| `--beams` | `1` | Beam search. Tested with `4` on 5 minutes checked against the audio: no real gain (12 lines better, 11 worse) and 2 more invented lines, at 2–3× the time. Leave at `1`. |
+| `--start` | none | Start N seconds into the recording, for testing a window (see A.4). |
 | `--language` | `auto` | `ar` forces Arabic output; `en` forces English. |
 | `--scratch-dir` | system temp | Temporary audio needs about 1 GB per player per 8 hours. Point it at a roomy drive if C: is tight. |
 

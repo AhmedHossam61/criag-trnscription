@@ -603,6 +603,8 @@ def main() -> None:
                         help=f"join one speaker's turns across pauses up to this long (default {MIN_GAP_S:g})")
     parser.add_argument("--min-peak-db", type=float, default=PHONE_MIN_PEAK_DBFS, metavar="DBFS",
                         help=f"skip chunks whose loudest sample is below this (default {PHONE_MIN_PEAK_DBFS:g})")
+    parser.add_argument("--beams", type=int, default=1, metavar="N",
+                        help="beam search width, as in craig_transcribe.py (default 1)")
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--batch-seconds", type=float, default=None, metavar="SECONDS")
     parser.add_argument("--limit", type=float, default=None, metavar="SECONDS",
@@ -771,8 +773,9 @@ def main() -> None:
         failed = 0
         if pending:
             backend = BACKENDS[args.backend](language=args.language)
-            batches = make_batches(pending, args.batch_size or backend.default_batch,
-                                   args.batch_seconds or backend.default_batch_seconds)
+            backend.beams = args.beams
+            batches = make_batches(pending, args.batch_size or max(1, backend.default_batch // args.beams),
+                                   args.batch_seconds or backend.default_batch_seconds / args.beams)
             print(f"Loading backend '{backend.name}'; {len(pending)} chunks in {len(batches)} batches.")
             backend.load()
             failed = run_batches(backend, batches,

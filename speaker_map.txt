@@ -24,6 +24,9 @@ megadon*      = SKIP
 megadoon*     = SKIP
 jockie*       = SKIP
 jockie_music* = SKIP
+# Joined the channel but not part of the game
+seifmonster*  = SKIP
+saif_ahmad1*  = SKIP
 # bodaa: 0 min of speech in the sample -- probably a player who didn't talk.
 # Not skipping (costs zero GPU time either way). Add a real-name mapping
 # once you know who they are, e.g.:  bodaa* = Some Character

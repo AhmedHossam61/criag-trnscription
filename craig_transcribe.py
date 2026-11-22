@@ -32,7 +32,7 @@ import time
 import wave
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 from pathlib import Path
 from typing import Sequence
 from xml.etree import ElementTree
@@ -142,6 +142,7 @@ class Segment:
     chunk_id: int = 0
     dropped: bool = False
     drop_reason: str = ""
+    original_text: str = ""  # set only in outputs, when llm_correct.py changed the text
 
 
 # ---------------------------------------------------------------------------
@@ -575,6 +576,12 @@ HALLUCINATION_PATTERNS = [
     r"web\s+(development|design)",
     r"engineering\s+college",
     r"cairo\s+university",
+    # Stock sentences from short clips of laughter/breath. Each came from
+    # every player in one session (39x for the first), so none is real speech.
+    r"مش\s+متأكد[ةه]?\s+[إا]ن\s+[أا]نا\s+بحبك",
+    r"^بصراح[ةه]\s+[أا]نا\s+مش\s+عارف\s+([أا]عمل\s+[إا]يه|[إا]يه\s+اللي\s+بيحصل\s+ده)\W*$",
+    r"^(طب\s+)?[أا]نا\s+بحب\s+[أا]عمل\s+(ازاي|[إا]يه\s+في\s+ال)",
+    r"بحبك\s+يا\s+حبيبي",
     # Chinese/Japanese/Korean script: nobody in the session speaks it.
     r"[぀-ヿ㐀-鿿가-힯]",
     r"^\W*$",
@@ -600,23 +607,65 @@ def repetition_ratio(text: str) -> float:
     return 1.0 - (len(set(tokens)) / len(tokens))
 
 
-def has_ngram_loop(text: str, n: int = 2, min_repeats: int = 3) -> bool:
-    """True if any n-gram appears >= min_repeats times.
+def loop_tokens(text: str) -> list[str]:
+    return re.sub(r"[^\w\s]", " ", normalize_arabic(text)).split()
 
-    Catches short-phrase loops that repetition_ratio misses -- e.g. the
-    'X Y X Y X Y' pattern where unique-token ratio stays modest but the
-    same bigram fires over and over.
+
+def has_tandem_repeat(tokens: list[str], max_n: int = 6) -> bool:
     """
-    tokens = normalize_arabic(text).split()
-    if len(tokens) < n * min_repeats:
-        return False
-    counts: dict[tuple[str, ...], int] = {}
-    for i in range(len(tokens) - n + 1):
-        gram = tuple(tokens[i:i + n])
-        counts[gram] = counts.get(gram, 0) + 1
-        if counts[gram] >= min_repeats:
+    True if a phrase of 1..max_n words is said back to back many times
+    ("X Y X Y X Y X Y"): what a decoder stuck in a loop produces. Single
+    words need 6 in a row, since "لا لا لا" and "ماشي ماشي ماشي" are real.
+    """
+    for n in range(1, max_n + 1):
+        need = 6 if n == 1 else 4
+        for i in range(len(tokens) - n * need + 1):
+            gram = tokens[i:i + n]
+            reps, j = 1, i + n
+            while tokens[j:j + n] == gram:
+                reps += 1
+                j += n
+            if reps >= need:
+                return True
+    return False
+
+
+def has_dominant_ngram(tokens: list[str], min_cover: float = 0.7) -> bool:
+    """
+    True if one 2-4 word phrase, said 3+ times, makes up most of the line.
+    Occurrences are counted without overlap, so "لا لا لا لا" is two "لا لا",
+    not three. 0.7 keeps a real line the model stuttered on ("لا انت انت ما
+    كنتش انت ما كنتش هتقول انت ما كنتش هتقول بتحورها", 0.64).
+    """
+    for n in (2, 3, 4):
+        if len(tokens) < 3 * n:
+            continue
+        counts: dict[tuple[str, ...], int] = {}
+        next_free: dict[tuple[str, ...], int] = {}
+        for i in range(len(tokens) - n + 1):
+            gram = tuple(tokens[i:i + n])
+            if i < next_free.get(gram, 0):
+                continue
+            counts[gram] = counts.get(gram, 0) + 1
+            next_free[gram] = i + n
+        top = max(counts.values())
+        if top >= 3 and top * n / len(tokens) >= min_cover:
             return True
     return False
+
+
+def has_ngram_loop(text: str) -> bool:
+    """
+    Short-phrase loops that repetition_ratio misses.
+
+    Repetition alone is not enough: Egyptian conversation repeats itself
+    ("ريت شوال ريت شوال يعني ايه ... مش ريت شوال", "هل انت هل انت نمت").
+    Counting any bigram said 3 times as a loop threw away 14 s of real
+    dialogue in a 5-minute test, so only back-to-back runs or a phrase that
+    dominates the line count.
+    """
+    tokens = loop_tokens(text)
+    return has_tandem_repeat(tokens) or has_dominant_ngram(tokens)
 
 
 def screen(text: str, chunk: Chunk) -> tuple[bool, str]:
@@ -632,7 +681,7 @@ def screen(text: str, chunk: Chunk) -> tuple[bool, str]:
     if repetition_ratio(stripped) > 0.82:
         return False, "token-loop"
 
-    if has_ngram_loop(stripped, n=2, min_repeats=3) or has_ngram_loop(stripped, n=3, min_repeats=3):
+    if has_ngram_loop(stripped):
         return False, "ngram-loop"
 
     # A model that produces far more text than the audio could carry is
@@ -706,6 +755,7 @@ class Backend:
     def __init__(self, language: str = "auto", hotwords: str | None = None):
         self.language = language
         self.hotwords = hotwords
+        self.beams = 1  # beam search width; backends that support it read this in load()
 
     def load(self) -> None:
         raise NotImplementedError
@@ -762,6 +812,12 @@ class QwenCleoBackend(Backend):
             device_map="cuda:0",
             max_inference_batch_size=-1,  # batches are sized by make_batches()
         )
+        if self.beams > 1:
+            # qwen_asr calls generate() with max_new_tokens only; extra
+            # generation options go straight through to transformers.
+            import functools
+            hf_model = self.model.model
+            hf_model.generate = functools.partial(hf_model.generate, num_beams=self.beams)
 
     def transcribe_batch(self, audio: list[np.ndarray], max_new_tokens: int) -> list[tuple[str, str]]:
         self.model.max_new_tokens = max_new_tokens
@@ -978,26 +1034,117 @@ def fmt_timestamp(seconds: float, comma: bool = True) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}{sep}{ms:03d}"
 
 
-def write_outputs(segments: list[Segment], outdir: Path, info: dict[str, str]) -> None:
-    # Re-apply screen() to previously-kept segments so new hallucination
-    # patterns added since the transcript was recorded take effect without
-    # re-running the model. Chunks the segment was cut from are reconstructed
-    # from the segment's own timing.
-    rescreened = 0
+# A sentence at least STOCK_MIN_WORDS long that comes out word for word from
+# STOCK_MIN_SPEAKERS different people, STOCK_MIN_COUNT+ times, is the model's
+# stock filler, not speech. Catches new ones the patterns above don't know.
+STOCK_MIN_WORDS = 5
+STOCK_MIN_SPEAKERS = 3
+STOCK_MIN_COUNT = 4
+
+
+def drop_stock_phrases(segments: list[Segment]) -> int:
+    """Mark session-wide repeated sentences as dropped; return how many."""
+    groups: dict[str, list[Segment]] = {}
     for seg in segments:
         if seg.dropped:
+            continue
+        norm = re.sub(r"[^\w\s]", "", normalize_arabic(seg.text)).strip()
+        if len(norm.split()) >= STOCK_MIN_WORDS:
+            groups.setdefault(norm, []).append(seg)
+    dropped = 0
+    for segs in groups.values():
+        if len(segs) >= STOCK_MIN_COUNT and len({s.speaker for s in segs}) >= STOCK_MIN_SPEAKERS:
+            for seg in segs:
+                seg.dropped, seg.drop_reason = True, "stock-phrase"
+                dropped += 1
+    return dropped
+
+
+def refresh_drops(segments: list[Segment]) -> None:
+    """
+    Re-apply screen() and the stock-phrase rule, so filter changes made since
+    the transcript was recorded take effect without re-running the model.
+    Chunks are reconstructed from each segment's own timing.
+
+    Text dropped by an older, stricter filter comes back too. Segments the
+    level gate dropped ("too-quiet") were judged on audio, not text, so they
+    stay dropped.
+    """
+    rescreened = restored = 0
+    for seg in segments:
+        if seg.dropped and seg.drop_reason == "too-quiet":
             continue
         chunk = Chunk(
             track_index=seg.track_index, speaker=seg.speaker,
             chunk_id=seg.chunk_id, start_s=seg.start_s, end_s=seg.end_s,
         )
         keep, reason = screen(seg.text, chunk)
-        if not keep:
-            seg.dropped = True
-            seg.drop_reason = reason
+        if not keep and not seg.dropped:
             rescreened += 1
+        elif keep and seg.dropped:
+            restored += 1
+        seg.dropped, seg.drop_reason = not keep, reason
     if rescreened:
         print(f"  re-screen dropped {rescreened} previously-kept segment(s)")
+    if restored:
+        print(f"  re-screen restored {restored} segment(s) an older filter had dropped")
+    stock = drop_stock_phrases(segments)
+    if stock:
+        print(f"  dropped {stock} segment(s) repeating a stock phrase across speakers")
+
+
+CORRECTIONS_FILE = "corrections.json"
+
+
+def apply_corrections(segments: list[Segment], outdir: Path) -> tuple[list[Segment], int]:
+    """
+    Overlay llm_correct.py's fixes, keyed "<track_index>:<chunk_id>", on copies
+    of the segments. segments.jsonl is never changed, so the raw model output
+    stays available and a new correction pass can always start over.
+    """
+    path = outdir / CORRECTIONS_FILE
+    if not path.exists():
+        return segments, 0
+    fixes = json.loads(path.read_text(encoding="utf-8"))
+    out, applied = [], 0
+    for seg in segments:
+        fix = fixes.get(f"{seg.track_index}:{seg.chunk_id}")
+        if fix is None or seg.dropped:
+            out.append(seg)
+            continue
+        applied += 1
+        if fix.get("drop"):
+            out.append(replace(seg, dropped=True, drop_reason="llm-no-speech"))
+        else:
+            out.append(replace(seg, text=fix["text"], original_text=seg.text))
+    return out, applied
+
+
+def write_transcript_txt(kept: list[Segment], path: Path, info: dict[str, str]) -> None:
+    """Readable transcript with consecutive turns by one speaker merged."""
+    with path.open("w", encoding="utf-8") as fh:
+        if info:
+            for key, value in info.items():
+                fh.write(f"# {key}: {value}\n")
+            fh.write("\n")
+        last_speaker = None
+        for seg in kept:
+            if seg.speaker != last_speaker:
+                fh.write(f"\n[{fmt_timestamp(seg.start_s, comma=False)}] {seg.speaker}:\n")
+                last_speaker = seg.speaker
+            # Mark non-Arabic turns so you can find the code-switches by eye.
+            script = label_script(seg.text)
+            tag = f"[{script}] " if script in ("en", "mixed") else ""
+            fh.write(f"  {tag}{seg.text}\n")
+
+
+def write_outputs(segments: list[Segment], outdir: Path, info: dict[str, str]) -> None:
+    refresh_drops(segments)
+    raw_kept = sorted((s for s in segments if not s.dropped), key=lambda s: (s.start_s, s.speaker))
+    segments, corrected = apply_corrections(segments, outdir)
+    if corrected:
+        print(f"  applied {corrected} correction(s) from {CORRECTIONS_FILE}")
+        write_transcript_txt(raw_kept, outdir / "transcript-uncorrected.txt", info)
 
     kept = sorted((s for s in segments if not s.dropped), key=lambda s: (s.start_s, s.speaker))
 
@@ -1016,21 +1163,7 @@ def write_outputs(segments: list[Segment], outdir: Path, info: dict[str, str]) -
             fh.write(f"{fmt_timestamp(seg.start_s)} --> {fmt_timestamp(seg.end_s)}\n")
             fh.write(f"{seg.speaker}: {seg.text}\n\n")
 
-    # Readable transcript with consecutive turns by one speaker merged.
-    with (outdir / "transcript.txt").open("w", encoding="utf-8") as fh:
-        if info:
-            for key, value in info.items():
-                fh.write(f"# {key}: {value}\n")
-            fh.write("\n")
-        last_speaker = None
-        for seg in kept:
-            if seg.speaker != last_speaker:
-                fh.write(f"\n[{fmt_timestamp(seg.start_s, comma=False)}] {seg.speaker}:\n")
-                last_speaker = seg.speaker
-            # Mark non-Arabic turns so you can find the code-switches by eye.
-            script = label_script(seg.text)
-            tag = f"[{script}] " if script in ("en", "mixed") else ""
-            fh.write(f"  {tag}{seg.text}\n")
+    write_transcript_txt(kept, outdir / "transcript.txt", info)
 
     dropped = [s for s in segments if s.dropped]
     if dropped:
@@ -1246,6 +1379,7 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
          speaker_map: dict[str, str] | None = None,
          min_peak_db: float = MIN_PEAK_DBFS,
          min_gap_s: float = MIN_GAP_S,
+         start_s: float | None = None,
          ) -> tuple[list[Track], dict[int, list[Chunk]], dict[int, Path], set[str]]:
     """
     Decode and segment every track. Chunks quieter than min_peak_db are left
@@ -1278,8 +1412,11 @@ def plan(root: Path, scratch: Path, limit_s: float | None,
         pcm = open_pcm(pcm_path)
         try:
             chunks = build_chunks(pcm, track, min_gap_s)
+            # Filtered after build_chunks, so chunk ids match a full run.
             if limit_s is not None:
                 chunks = [c for c in chunks if c.end_s <= limit_s]
+            if start_s is not None:
+                chunks = [c for c in chunks if c.start_s >= start_s]
             loud = [c for c in chunks if chunk_peak_db(pcm, track, c) >= min_peak_db]
         finally:
             close_pcm(pcm)
@@ -1365,7 +1502,27 @@ def main() -> None:
     )
     parser.add_argument(
         "--limit", type=float, default=None, metavar="SECONDS",
-        help="only transcribe the first N seconds -- use this to benchmark backends",
+        help=(
+            "only transcribe up to N seconds into the recording -- use this to "
+            "benchmark backends. With --start, the end of the window."
+        ),
+    )
+    parser.add_argument(
+        "--start", type=float, default=None, metavar="SECONDS",
+        help=(
+            "only transcribe from N seconds into the recording, e.g. --start 11700 "
+            "--limit 12000 for 03:15:00-03:20:00. For comparing settings on a short "
+            "stretch; use a separate -o folder for each setting."
+        ),
+    )
+    parser.add_argument(
+        "--beams", type=int, default=1, metavar="N",
+        help=(
+            "beam search width (qwencleo only). 1 (default) = greedy, fastest. "
+            "4 considers several candidate sentences and keeps the most likely, "
+            "usually a bit more accurate, roughly 2-3x slower. Batch defaults "
+            "shrink automatically to fit VRAM."
+        ),
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -1405,9 +1562,11 @@ def main() -> None:
         if args.speaker_map:
             # Rename segments transcribed before the map had an entry for them.
             speaker_map = load_speaker_map(args.speaker_map)
-            for seg in done.values():
+            for key, seg in list(done.items()):
                 renamed = map_speaker(seg.speaker, speaker_map)
-                if renamed and renamed.upper() not in {"SKIP", "-", "IGNORE"}:
+                if renamed and renamed.upper() in {"SKIP", "-", "IGNORE"}:
+                    del done[key]  # hidden from the transcript; segments.jsonl keeps it
+                elif renamed:
                     seg.speaker = renamed
         marker = args.outdir / "recording.json"
         info = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else {}
@@ -1441,7 +1600,7 @@ def main() -> None:
         t0 = time.time()
         tracks, plans, pcm_paths, quiet = plan(
             root, scratch, args.limit, speaker_map=speaker_map,
-            min_peak_db=args.min_peak_db, min_gap_s=args.min_gap,
+            min_peak_db=args.min_peak_db, min_gap_s=args.min_gap, start_s=args.start,
         )
         total_chunks = sum(len(c) for c in plans.values())
         total_speech = sum(c.duration_s for cs in plans.values() for c in cs)
@@ -1459,10 +1618,14 @@ def main() -> None:
             hotwords = args.hotwords.read_text(encoding="utf-8").strip()
 
         backend = BACKENDS[args.backend](language=args.language, hotwords=hotwords)
+        backend.beams = args.beams
         if hotwords and not backend.supports_hotwords:
             print(f"  note: backend '{backend.name}' ignores --hotwords")
-        batch_size = args.batch_size or backend.default_batch
-        batch_seconds = args.batch_seconds or backend.default_batch_seconds
+        if args.beams > 1 and backend.name != "qwencleo":
+            print(f"  note: --beams is only used by qwencleo; '{backend.name}' ignores it")
+        # Each beam is another copy of the batch on the GPU.
+        batch_size = args.batch_size or max(1, backend.default_batch // args.beams)
+        batch_seconds = args.batch_seconds or backend.default_batch_seconds / args.beams
 
         jsonl = args.outdir / "segments.jsonl"
         done = load_done(jsonl)
