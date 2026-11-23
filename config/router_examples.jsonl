@@ -1,0 +1,91 @@
+// Examples that teach the router when a question needs several searches.
+// "single": one passage (or a few next to each other) can answer it.
+// "multi":  the answer has to be put together from different places.
+// Add your own questions here, especially ones it got wrong; it retrains on the next start.
+// Check it with: scribe rag router-eval
+{"question": "What does the Ritual Adept feature do?", "label": "single"}
+{"question": "How many spell slots does a level 5 wizard have?", "label": "single"}
+{"question": "What is a long rest?", "label": "single"}
+{"question": "How does a short rest work?", "label": "single"}
+{"question": "What is the range of Detect Magic?", "label": "single"}
+{"question": "How far can I see with dark vision?", "label": "single"}
+{"question": "Who is Arnok?", "label": "single"}
+{"question": "What is The Nameless Beyond?", "label": "single"}
+{"question": "What are the celestial shards?", "label": "single"}
+{"question": "Who leads the cult?", "label": "single"}
+{"question": "What did the DM say about the altar?", "label": "single"}
+{"question": "What happened at the start of session 19?", "label": "single"}
+{"question": "Which deity does Thalion worship?", "label": "single"}
+{"question": "What is Vaylor's class?", "label": "single"}
+{"question": "What is the DC for a religion check on the altar?", "label": "single"}
+{"question": "How does grappling work?", "label": "single"}
+{"question": "What does the Shield spell do?", "label": "single"}
+{"question": "What is Kael's armor class?", "label": "single"}
+{"question": "Where did we leave off last session?", "label": "single"}
+{"question": "What is the name of the tavern keeper?", "label": "single"}
+{"question": "What are the rules for opportunity attacks?", "label": "single"}
+{"question": "What does exhaustion level 3 do?", "label": "single"}
+{"question": "When can I cast a spell as a ritual?", "label": "single"}
+{"question": "What is concentration?", "label": "single"}
+{"question": "Who are the guardians?", "label": "single"}
+{"question": "What item did we find in the crypt?", "label": "single"}
+{"question": "How much gold do we have?", "label": "single"}
+{"question": "What did the old man tell Kael?", "label": "single"}
+{"question": "What does advantage mean?", "label": "single"}
+{"question": "What language do the guardians speak?", "label": "single"}
+{"question": "How long does it take to attune to a magic item?", "label": "single"}
+{"question": "What is the cult's symbol?", "label": "single"}
+{"question": "Who killed the merchant?", "label": "single"}
+{"question": "What does the inscription on the altar say?", "label": "single"}
+{"question": "What level is Arnok now?", "label": "single"}
+{"question": "Can a warlock use a spell scroll?", "label": "single"}
+{"question": "What happens when you drop to 0 hit points?", "label": "single"}
+{"question": "What is the cover bonus to AC?", "label": "single"}
+{"question": "Where is the temple?", "label": "single"}
+{"question": "What did Thalion say about the shard?", "label": "single"}
+{"question": "مين أرنوك؟", "label": "single"}
+{"question": "يعني ايه long rest؟", "label": "single"}
+{"question": "الـ altar كان فيه ايه؟", "label": "single"}
+{"question": "ايه هي ال celestial shards؟", "label": "single"}
+{"question": "Kael عنده كام spell slot؟", "label": "single"}
+{"question": "الـ DM قال ايه عن الـ cult؟", "label": "single"}
+{"question": "احنا وقفنا فين آخر سيشن؟", "label": "single"}
+{"question": "الـ detect magic بتعمل ايه؟", "label": "single"}
+{"question": "Compare what the cult and the guardians want from the celestial shards.", "label": "multi"}
+{"question": "What is the difference between a long rest and a short rest?", "label": "multi"}
+{"question": "How has Arnok's relationship with the guardians changed over the sessions?", "label": "multi"}
+{"question": "What do we know about The Nameless Beyond, and how is it connected to the cult?", "label": "multi"}
+{"question": "Who knows where the shards are, and what did each of them tell us?", "label": "multi"}
+{"question": "List all the NPCs we met in session 19 and what they wanted.", "label": "multi"}
+{"question": "Summarize everything that happened with the altar across all sessions.", "label": "multi"}
+{"question": "Why did the guardians attack us after we found the shard?", "label": "multi"}
+{"question": "Which of Kael's spells would work best against the cult leader, given his resistances?", "label": "multi"}
+{"question": "Can Thalion cast Detect Magic as a ritual, and how many spell slots would that save him?", "label": "multi"}
+{"question": "What happened to the merchant, and who benefited from it?", "label": "multi"}
+{"question": "How do the rules for concentration interact with taking damage while casting a ritual?", "label": "multi"}
+{"question": "Compare Vaylor's and Kael's abilities in combat.", "label": "multi"}
+{"question": "What clues point to who leads the cult?", "label": "multi"}
+{"question": "Track the celestial shards: where was each one found and who has it now?", "label": "multi"}
+{"question": "What promises did we make to NPCs that we haven't kept yet?", "label": "multi"}
+{"question": "Which deity is connected to the altar, and what does the religion check tell us about it?", "label": "multi"}
+{"question": "How did the party end up in the temple, and what did we learn there?", "label": "multi"}
+{"question": "What are the rules for grappling and shoving, and which one is better for Arnok?", "label": "multi"}
+{"question": "Give me a recap of the last two sessions.", "label": "multi"}
+{"question": "Who has dark vision in the party and who doesn't?", "label": "multi"}
+{"question": "What do the cult and The Nameless Beyond have in common?", "label": "multi"}
+{"question": "When did we first hear about the guardians, and what has changed since then?", "label": "multi"}
+{"question": "What items does each party member carry?", "label": "multi"}
+{"question": "Is the old man lying? Compare what he said with what the DM described later.", "label": "multi"}
+{"question": "What led to the fight at the end of session 19?", "label": "multi"}
+{"question": "Explain the Ritual Adept feature and list which of my spells it works with.", "label": "multi"}
+{"question": "What are all the times someone made a religion check, and what did they find?", "label": "multi"}
+{"question": "How is Vaylor connected to the guardians, and does Thalion know?", "label": "multi"}
+{"question": "Which rules apply when a creature is both prone and restrained?", "label": "multi"}
+{"question": "What do the transcripts say about the shard compared to the campaign notes?", "label": "multi"}
+{"question": "قارن بين الـ cult والـ guardians", "label": "multi"}
+{"question": "ايه الفرق بين long rest و short rest؟", "label": "multi"}
+{"question": "لخص كل اللي حصل في الجلسات اللي فاتت", "label": "multi"}
+{"question": "أرنوك عمل ايه مع الـ guardians وكمان ايه اللي حصل مع الـ cult؟", "label": "multi"}
+{"question": "ازاي اتغيرت علاقة Kael بالـ DM characters على مدار السيشنز؟", "label": "multi"}
+{"question": "مين معاه shards ومين لأ؟", "label": "multi"}
+{"question": "كل مرة حد عمل religion check طلع ايه؟", "label": "multi"}

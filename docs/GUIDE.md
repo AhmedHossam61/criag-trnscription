@@ -1,14 +1,18 @@
-# How to run the transcriber
+# How to run everything
 
-Two scripts, one for each kind of recording:
+Everything goes through one command, `scribe`:
 
-| You have | Use | Speakers come from |
+| You want to | Command | Part |
 |---|---|---|
-| A Craig zip from Discord (one track per player) | `craig_transcribe.py` | Discord usernames, via `speaker_map.txt` |
-| One mixed recording (a phone on the table, a Zoom export, ...) | `phone_transcribe.py` | Voice matching against profiles built from Craig recordings |
+| Transcribe a Craig zip from Discord (one track per player) | `scribe craig` | A |
+| Transcribe one mixed recording (a phone on the table, a Zoom export, ...) | `scribe phone` | B |
+| Fix misheard names and terms with Gemini | `scribe correct` | C |
+| Ask questions about your documents and sessions | `scribe serve` (chat UI) or `scribe rag` | D |
 
 All commands below are for **PowerShell**, run from the project folder
-`G:\AI_ML\Projects\Criag_transcriber`.
+`G:\AI_ML\Projects\Criag_transcriber`. Recordings go in `data\recordings\`,
+transcripts land in `data\transcripts\<recording id>\`, and the documents the
+archive answers from go in `data\documents\`.
 
 ---
 
@@ -20,16 +24,18 @@ All commands below are for **PowerShell**, run from the project folder
 - `uv`. Check with `uv --version`. If it's missing: `winget install --id=astral-sh.uv -e`.
 
 ### 0.2 Create the environment
-The `.venv-qwencleo` environment already exists on this machine. To rebuild it from scratch (from **cmd**, not PowerShell):
+The `.venv-qwencleo` environment already exists on this machine, with the project installed in it. To rebuild it from scratch (from **cmd**, not PowerShell):
 
 ```cmd
-setup.cmd qwencleo
+scripts\setup.cmd qwencleo
 ```
 
-Then add the packages the phone script needs. They don't change torch:
+This installs torch, the speech model, and this project (`scribe`, the archive and the chat UI).
+
+If you ever change `pyproject.toml` or move the folder, re-install the project into the environment:
 
 ```powershell
-uv pip install --python .\.venv-qwencleo\Scripts\python.exe pyannote.audio silero-vad
+uv pip install --python .\.venv-qwencleo\Scripts\python.exe -e ".[rag,server,correct]"
 ```
 
 ### 0.3 Activate it (every new terminal)
@@ -38,41 +44,44 @@ uv pip install --python .\.venv-qwencleo\Scripts\python.exe pyannote.audio siler
 .\.venv-qwencleo\Scripts\Activate.ps1
 ```
 
-The prompt should start with `(.venv-qwencleo)`. If you see `ModuleNotFoundError: No module named 'qwencleo_asr'`, you are in the wrong environment (for example `.venv`). Run `deactivate`, then activate `.venv-qwencleo`.
+The prompt should start with `(.venv-qwencleo)`. If `scribe` is not found, or you see `No module named 'qwencleo_asr'`, you are in the wrong environment (for example `.venv`). Run `deactivate`, then activate `.venv-qwencleo`.
 
 ### 0.4 Check everything works
 
 ```powershell
-python craig_transcribe.py --check-env
+scribe craig --check-env
 ```
 
 ---
 
-## Part A: Craig recordings (`craig_transcribe.py`)
+## Part A: Craig recordings (`scribe craig`)
 
 ### A.1 Transcribe a session
-Pass the Craig `.zip` directly; there's no need to extract it. Use a **new output folder per recording**:
+Put the Craig `.zip` in `data\recordings\` (no need to extract it) and run:
 
 ```powershell
-python craig_transcribe.py "lYTb4e_RvE3iMkK4werllBBrVxIcps.sesx.zip" -o out-5oTKajQzwGEm --speaker-map speaker_map.txt
+scribe craig "data\recordings\craig-v3owGZBtlLQA-kLUAHXQ8yB5gQu8PPAhxF3gfZdDmYF.sesx.zip"
 ```
 
-The output folder (`-o`) will contain:
+- The output goes to `data\transcripts\<recording id>\`, here `data\transcripts\v3owGZBtlLQA\`. Use `-o FOLDER` to choose another.
+- Speaker names come from `config\speaker_map.txt` automatically (see A.3).
+
+The output folder will contain:
 
 | File | What it is |
 |---|---|
 | `transcript.txt` | Readable transcript, grouped by speaker. **Start here.** |
 | `transcript.srt` | Subtitles with timestamps (opens in VLC next to the audio). |
-| `transcript.json` | Everything, for scripts. |
+| `transcript.json` | Everything, for scripts. The archive (Part D) reads this. |
 | `dropped.txt` | Lines the filters threw away as likely hallucinations. Check it if something seems missing. |
 | `segments.jsonl` | Raw progress log used for resume. Don't edit it. |
 | `recording.json` | Which recording and settings this folder belongs to. |
 
 ### A.2 Stop and resume
-Press `Ctrl+C` any time. To continue, run **the exact same command** again; finished parts are skipped. The script refuses to mix a different recording into the same folder.
+Press `Ctrl+C` any time. To continue, run **the exact same command** again; finished parts are skipped. The command refuses to mix a different recording into the same folder.
 
-### A.3 Speaker names: `speaker_map.txt`
-Craig names tracks by Discord username. `speaker_map.txt` renames them:
+### A.3 Speaker names: `config\speaker_map.txt`
+Craig names tracks by Discord username. `config\speaker_map.txt` renames them:
 
 ```
 ahmedhoss61  = Kael
@@ -83,36 +92,37 @@ jockie*      = SKIP      # music bot: not transcribed at all
 - The left side ignores case, and `*` matches anything.
 - `SKIP` drops that track.
 - If a run shows a raw username, add a line for it and use A.5 to rename without re-transcribing.
+- To use a different file, pass `--speaker-map FILE`.
 
 ### A.4 Try it on a few minutes first
 
 ```powershell
 # Only the first 5 minutes
-python craig_transcribe.py "session.zip" -o test-out --speaker-map speaker_map.txt --limit 300
+scribe craig "data\recordings\session.zip" -o data\experiments\test --limit 300
 
 # Just show how much speech there is per player; no GPU
-python craig_transcribe.py "session.zip" -o test-out --speaker-map speaker_map.txt --dry-run
+scribe craig "data\recordings\session.zip" --dry-run
 
 # A window in the middle: 03:15:00 to 03:20:00 (seconds = h*3600 + m*60)
-python craig_transcribe.py "session.zip" -o test-window --speaker-map speaker_map.txt --start 11700 --limit 12000
+scribe craig "data\recordings\session.zip" -o data\experiments\window --start 11700 --limit 12000
 ```
 
-To compare settings, run the same window into a separate folder per setting and read the two `transcript.txt` files side by side.
+Use `data\experiments\` for tests: the archive only reads `data\transcripts\`, so trial runs don't end up in the answers. To compare settings, run the same window into a separate folder per setting and read the two `transcript.txt` files side by side.
 
 ### A.5 Re-write the transcript without re-transcribing
-Use this after editing `speaker_map.txt`, or after the hallucination filters are updated:
+Use this after editing `config\speaker_map.txt`, or after the hallucination filters are updated:
 
 ```powershell
-python craig_transcribe.py --rewrite-outputs -o out-5oTKajQzwGEm --speaker-map speaker_map.txt
+scribe craig --rewrite-outputs -o data\transcripts\v3owGZBtlLQA
 ```
 
 It takes seconds and doesn't use the GPU.
 
 ### A.6 Older output folders (`--min-gap`)
-Folders made before the "whole sentences" change (`out`, `out-AqliOggnsXbo`, `out-5oTKajQzwGEm`) used the older 0.45 s setting. The script stops and tells you if you mix settings.
+Folders made before the "whole sentences" change used the older 0.45 s setting. The command stops and tells you if you mix settings.
 
 - **To finish or rewrite an old folder as-is**, add `--min-gap 0.45`.
-- **For the better, whole-sentence version**, transcribe again into a **new** folder, e.g. `-o out-AqliOggnsXbo-v2`.
+- **For the better, whole-sentence version**, transcribe again into a **new** folder.
 
 ### A.7 Useful options
 
@@ -132,9 +142,9 @@ Speed: about 4× realtime. One hour of *speech* (not recording length) takes abo
 
 ---
 
-## Part B: one mixed recording (`phone_transcribe.py`)
+## Part B: one mixed recording (`scribe phone`)
 
-The script does three things:
+The command does three things:
 
 1. **Who spoke when.** Splits the recording into speaker turns (diarization).
 2. **Who is who.** Names each speaker by comparing their voice with saved voice profiles.
@@ -144,25 +154,22 @@ The script does three things:
 The profiles are learned from your Craig recordings, where each track is one known person:
 
 ```powershell
-python phone_transcribe.py --enroll recording.zip "lYTb4e_RvE3iMkK4werllBBrVxIcps.sesx.zip" "craig-AqliOggnsXbo-Kxc5cerDJMktKvezsVw_n-MIqBn-6z.sesx.zip" --speaker-map speaker_map.txt
+scribe phone --enroll "data\recordings\craig-F4fL0XAStKft-NbceN5GheS_qljB8l0sFInUlcqgBPm.sesx.zip" "data\recordings\craig-v3owGZBtlLQA-kLUAHXQ8yB5gQu8PPAhxF3gfZdDmYF.sesx.zip" --speaker-map config\speaker_map.txt
 ```
 
-- This writes `voices.npz` and takes about 2 minutes per recording. **It is already done** for these three.
-- Each new Craig session you enroll **adds** to the profiles, which makes matching more reliable. To add one:
-  ```powershell
-  python phone_transcribe.py --enroll "new-session.zip" --speaker-map speaker_map.txt
-  ```
-- To start over, delete `voices.npz`.
+- This writes `data\voices.npz` and takes about 2 minutes per recording. **It is already done** for three earlier sessions.
+- Each new Craig session you enroll **adds** to the profiles, which makes matching more reliable.
+- To start over, delete `data\voices.npz`.
 - `voices.npz` contains your friends' voice prints, so it is kept out of git on purpose.
 
 ### B.2 Transcribe the recording
 Any audio or video format ffmpeg reads works (m4a, mp3, wav, ogg, mp4, ...):
 
 ```powershell
-python phone_transcribe.py "session.m4a" -o out-phone-session1 --num-speakers 5
+scribe phone "data\recordings\session.m4a" --num-speakers 5
 ```
 
-Always pass `--num-speakers` with the number of people who talk; it matters a lot for accuracy.
+The output goes to `data\transcripts\phone-session\` (or `-o FOLDER`). Always pass `--num-speakers` with the number of people who talk; it matters a lot for accuracy.
 
 The console shows the speakers it found and how sure it is about each:
 
@@ -186,7 +193,7 @@ Besides the files from A.1, the output folder gets:
 Resume works like A.2: run the same command again.
 
 ### B.3 Fix or set names (no re-transcribing)
-Make a text file, e.g. `phone_names.txt`:
+Make a text file, e.g. `config\phone_names.txt`:
 
 ```
 SPEAKER_03 = Thalion        # rename by speaker id
@@ -197,15 +204,15 @@ Vaylor     = SKIP           # hide someone from the transcript
 Then run:
 
 ```powershell
-python phone_transcribe.py --rewrite-outputs -o out-phone-session1 --speaker-map phone_names.txt
+scribe phone --rewrite-outputs -o data\transcripts\phone-session --speaker-map config\phone_names.txt
 ```
 
 ### B.4 Better speaker detection with pyannote (optional, recommended)
-Without setup, the script uses its **built-in** detector, which scored 96% correct in testing. **pyannote** is usually more accurate, especially when people talk over each other. It is free but needs a Hugging Face account:
+Without setup, the command uses its **built-in** detector, which scored 96% correct in testing. **pyannote** is usually more accurate, especially when people talk over each other. It is free but needs a Hugging Face account:
 
 1. Create a token (type "Read") at https://hf.co/settings/tokens.
 2. Open https://hf.co/pyannote/speaker-diarization-community-1 and accept the conditions.
-3. Give the token to the script, in either of two ways:
+3. Give the token to the command, in either of two ways:
    ```powershell
    # Option 1: for this terminal only
    $env:HF_TOKEN = "hf_xxxxxxxxxxxxxxxx"
@@ -214,7 +221,7 @@ Without setup, the script uses its **built-in** detector, which scored 96% corre
    hf auth login
    ```
 
-After that, `phone_transcribe.py` uses pyannote automatically (`--diarizer auto`). To force one or the other:
+After that, `scribe phone` uses pyannote automatically (`--diarizer auto`). To force one or the other:
 
 ```powershell
 --diarizer pyannote   # error if it can't load (shows why)
@@ -228,10 +235,10 @@ The "who spoke when" result is saved. To redo it, for example with a different `
 
 ```powershell
 # Speakers and names only, no transcription (about 1 minute)
-python phone_transcribe.py "session.m4a" -o test-phone --num-speakers 5 --dry-run
+scribe phone "data\recordings\session.m4a" -o data\experiments\phone --num-speakers 5 --dry-run
 
 # First 5 minutes, fully transcribed
-python phone_transcribe.py "session.m4a" -o test-phone5 --num-speakers 5 --limit 300
+scribe phone "data\recordings\session.m4a" -o data\experiments\phone5 --num-speakers 5 --limit 300
 ```
 
 ### B.7 Useful options
@@ -240,7 +247,7 @@ python phone_transcribe.py "session.m4a" -o test-phone5 --num-speakers 5 --limit
 |---|---|---|
 | `--num-speakers N` | none | Number of people talking. **Always set it.** |
 | `--min-speakers` / `--max-speakers` | none | Use these instead when you're not sure (pyannote only). |
-| `--voices FILE` | `voices.npz` | Which profile file to use. |
+| `--voices FILE` | `data\voices.npz` | Which profile file to use. |
 | `--diarizer` | `auto` | `auto`, `pyannote` or `basic` (see B.4). |
 | `--hf-token` | `$HF_TOKEN` | Token for pyannote, passed on the command line. |
 | `--min-gap` | `1.5` | Joins one person's turns across pauses up to this many seconds. |
@@ -258,32 +265,33 @@ Speed: about 15 minutes per hour of recording on the RTX 3050.
 
 ---
 
-## Part C: fix misheard words with Gemini (`llm_correct.py`)
+## Part C: fix misheard words with Gemini (`scribe correct`)
 
 The speech model gets names, D&D terms and fast slang wrong: "religion check" comes out as "الريجيت شيك" and "Arnok" as "ارضك". After transcribing (Part A or B), this sends Gemini **the audio** of each window together with the transcript lines and your glossary. Gemini fixes what it hears is wrong, and marks lines where nobody actually spoke.
 
 ### C.1 Setup (once)
-- **API keys:** put them in `.env` next to the scripts:
+- **API keys:** put them in `.env` in the project folder (see `.env.example`):
   ```
   GEMINI_API=your-first-key
   GEMINI_API_2=your-second-key
   ```
   Get keys at https://aistudio.google.com/apikey. When one key runs out of quota, the next takes over. `.env` is kept out of git.
-- **Glossary:** edit `glossary.txt` with your campaign's names and words (NPCs, places, items, how names get misheard). It is already seeded with what we know. Names matter most; Gemini knows the D&D rules already.
+- **Glossary:** edit `config\glossary.txt` with your campaign's names and words (NPCs, places, items, how names get misheard). Names matter most; Gemini knows the D&D rules already.
 
 ### C.2 Run it
 
 ```powershell
-# Craig session: pass the same zip and speaker map
-python llm_correct.py -o out-v3owGZBtlLQA --audio "craig-v3owGZBtlLQA-kLUAHXQ8yB5gQu8PPAhxF3gfZdDmYF.sesx.zip" --speaker-map speaker_map.txt
+# Craig session: pass the same zip (config\speaker_map.txt is used for SKIP tracks)
+scribe correct -o data\transcripts\v3owGZBtlLQA --audio "data\recordings\craig-v3owGZBtlLQA-kLUAHXQ8yB5gQu8PPAhxF3gfZdDmYF.sesx.zip"
 
 # Phone session: pass the recording
-python llm_correct.py -o out-phone-session1 --audio "session.m4a"
+scribe correct -o data\transcripts\phone-session --audio "data\recordings\session.m4a"
 ```
 
 - **One call per 30 minutes of session.** A 6-hour session needs 12 calls; the free tier gives about 20 per key per day.
 - **Progress is saved after every call.** If the daily limit is reached, run the same command the next day and it continues.
 - **Try one call first:** add `--max-calls 1`. To see the plan without spending calls: `--dry-run`.
+- The call budget is shared with the archive's answers (Part D), counted per key and per model in `data\.gemini_usage.json`.
 
 ### C.3 What you get
 | File | What it is |
@@ -295,18 +303,106 @@ python llm_correct.py -o out-phone-session1 --audio "session.m4a"
 
 `segments.jsonl` is never changed, so nothing is lost:
 - `--rewrite-outputs` (Part A/B) keeps the corrections.
-- `python llm_correct.py -o FOLDER --undo` removes them all.
+- `scribe correct -o FOLDER --undo` removes them all.
 - `--redo` throws them away and corrects again, e.g. after improving the glossary.
 
 ### C.4 Options
 | Option | Default | Meaning |
 |---|---|---|
-| `--glossary` | `glossary.txt` | Your names and terms. |
+| `--glossary` | `config\glossary.txt` | Your names and terms. |
 | `--window-min` | `30` | Minutes of session per call. Larger means fewer calls, but Gemini may skim. |
 | `--model` | `gemini-2.5-flash` | Which Gemini model. `--list-models` shows what your key can use. |
-| `--daily-limit` | `20` | Calls per key per day; the script stops before Google does. |
+| `--daily-limit` | `20` | Calls per key per day; the command stops before Google does. |
 | `--max-calls` | none | Stop after N calls in this run. |
 | Without `--audio` | | Text-only mode: Gemini only fixes obvious things (glossary names, English spelled in Arabic letters). Much weaker; use the audio. |
+
+After correcting, run `scribe rag ingest` (or **Re-index** in the UI) so the archive picks up the corrected text.
+
+---
+
+## Part D: the archive (ask questions about your files)
+
+A small RAG system over two kinds of files:
+
+- **Your documents** in `data\documents\`: rulebooks, campaign notes, character sheets, homebrew. PDF, Markdown, Word (`.docx`), text and HTML are read.
+- **Session transcripts** in `data\transcripts\*\transcript.json`, added automatically.
+
+### D.1 How an answer is made
+1. **Router.** A small classifier decides whether the question needs **one search** ("What does Ritual Adept do?") or **several** ("Compare what the cult and the guardians want"). It is trained on the examples in `config\router_examples.jsonl`.
+2. **Search.** Each search combines meaning (the `bge-m3` embedding model, which matches English and Arabic to each other) with exact words (BM25, for names like "Arnok").
+3. **Rerank.** A local cross-encoder (`bge-reranker-v2-m3`) reads the question with each candidate passage and keeps the most relevant.
+4. **Multi-step only.** The LLM splits the question into sub-questions, each is searched, and if something is still missing it runs one more round of searches.
+5. **Answer.** The LLM (Gemini, or a local Ollama model) writes the answer from the passages only, citing them as `[1]`, `[2]`.
+
+### D.2 First run
+
+```powershell
+# 1. Add your files
+copy "C:\path\to\Players Handbook.pdf" data\documents\
+
+# 2. Build the index. The first time downloads the two models (about 4.5 GB)
+scribe rag ingest
+
+# 3. Start the chat UI, then open http://127.0.0.1:8000
+scribe serve
+```
+
+Afterwards, `scribe rag ingest` only re-reads files that are new or changed, so it takes seconds. In the UI, the **Library** tab does the same: drop files on it to upload and index them, and **Re-index** after adding files by hand or finishing a transcript.
+
+### D.3 The chat UI
+- **Auto / One-step / Multi-step** under the question box: Auto lets the router decide; the other two force a mode.
+- Each answer shows how it was routed (and the router's probability), and how many searches it ran.
+- **Sources** (right side): the passages the answer used, numbered like the citations. Click a `[2]` in the answer to jump to that passage. **Show context** loads the passages just before and after it. The scores are the reranker's relevance (`rel`), the meaning similarity (`sim`) and the keyword score (`kw`).
+- Conversations are kept in your browser. A follow-up like "and what about him?" is searched together with your previous question.
+- The status panel (bottom left) shows the models, the index size, and how many Gemini calls are left today.
+
+### D.4 From the terminal
+
+```powershell
+scribe rag status                       # what is indexed
+scribe rag ask "What does Ritual Adept do?"
+scribe rag ask --mode multi "Compare the cult and the guardians"
+scribe rag search "celestial shards"    # retrieval only, no LLM call: check what it finds
+scribe rag classify "Who has dark vision in the party?"
+scribe rag router-eval                  # router accuracy on its examples
+scribe rag ingest --rebuild             # re-embed everything
+```
+
+### D.5 Which LLM answers
+Set in `config\rag.toml` under `[llm]`. Providers are tried in order:
+
+```toml
+providers = ["gemini", "ollama"]
+```
+
+- **Gemini** uses the keys in `.env`. Free tier: about 20 calls per key per model per day, shared with `scribe correct`. A one-step question costs **1 call**; a multi-step question costs **2–3** (plan, maybe one follow-up, answer). To save calls, set `max_hops = 1` under `[multistep]`, or point `[llm.gemini] model` at a model with a bigger free quota (`scribe correct --list-models` lists them).
+- **Ollama** runs a model on your own GPU: no limit, nothing leaves the computer. Install from https://ollama.com, then:
+  ```powershell
+  ollama pull qwen3:4b
+  ```
+  `qwen3:4b` fits next to the embedder and reranker in 8 GB. When Gemini is out of calls, the archive switches to it automatically. To use only Ollama, set `providers = ["ollama"]`.
+
+### D.6 The router
+- `scribe rag router-eval` shows the classifier's cross-validated accuracy on `config\router_examples.jsonl`, next to plain keyword rules, and lists the questions it gets wrong.
+- To teach it, add lines to `config\router_examples.jsonl` (`"single"` or `"multi"`), especially questions it routed wrongly. It retrains in under a second the next time it starts.
+- `[router] mode` in `rag.toml`: `classifier` (default), `heuristic` (keyword rules, no training), or `single` / `multi` to always use one path.
+
+### D.7 Trying other models
+All in `config\rag.toml`:
+
+| Setting | Default | Notes |
+|---|---|---|
+| `[embedding] model` | `BAAI/bge-m3` | Any Hugging Face embedding model. Set `pooling` to match it (`cls` for bge, `mean` for e5, `last` for Qwen3-Embedding), and the prefixes for models that want them (`query: ` / `passage: ` for e5). Changing it rebuilds the index. |
+| `[reranker] model` | `BAAI/bge-reranker-v2-m3` | Any cross-encoder. `enabled = false`, or `scribe serve --no-rerank`, to compare answers without it. |
+| `[retrieval] final_k` | `6` | Passages an answer is written from (one-step). |
+| `[chunking] chunk_words` | `220` | Passage size. Changing it rebuilds the index. |
+
+`scribe rag search "..."` is the quickest way to see how a change affects what is found.
+
+### D.8 Good documents
+- Text PDFs work; **scanned** PDFs (images of pages) have no text to read and come out empty. Run OCR on them first.
+- Markdown headings (`#`, `##`) and Word heading styles are kept, so answers can cite "Campaign notes > The Cult".
+- One topic per file is easier to manage than one giant file: deleting or updating it only touches its own passages.
 
 ---
 
@@ -314,16 +410,21 @@ python llm_correct.py -o out-phone-session1 --audio "session.m4a"
 
 | Problem | Fix |
 |---|---|
-| `No module named 'qwencleo_asr'` / `'pyannote'` | Wrong environment. Run `deactivate`, then `.\.venv-qwencleo\Scripts\Activate.ps1`. |
+| `scribe` not found / `No module named 'qwencleo_asr'` | Wrong environment. Run `deactivate`, then `.\.venv-qwencleo\Scripts\Activate.ps1`. If it still isn't found, re-install the project (0.2). |
 | `ffmpeg not found` | `winget install Gyan.FFmpeg`, then open a new terminal. |
 | `error: ... already holds recording X` | That folder belongs to another recording. Use a different `-o`. |
 | `error: ... was transcribed with --min-gap 0.45` | Old folder; see A.6. |
-| Very slow, GPU memory full | Windows spills VRAM into system RAM instead of crashing. Close other GPU apps (browser, games), or use `--batch-seconds 60`. |
-| `pyannote unavailable (GatedRepoError ...)` | No token, or the model's conditions weren't accepted; see B.4. The script falls back to the built-in detector meanwhile. |
+| Very slow, GPU memory full | Windows spills VRAM into system RAM instead of crashing. Close other GPU apps (browser, games, `scribe serve`), or use `--batch-seconds 60`. |
+| `pyannote unavailable (GatedRepoError ...)` | No token, or the model's conditions weren't accepted; see B.4. The command falls back to the built-in detector meanwhile. |
 | Invented lines ("web development", "بحبك ... بحبني") | Raise `--min-peak-db` (e.g. `-35`) in a new folder. New filter patterns can be applied to old folders with `--rewrite-outputs`. |
-| `llm_correct.py`: "out of quota" on every key | The free daily limit is used up. Run the same command tomorrow; finished windows are kept. |
-| `llm_correct.py`: a window "failed" | Usually temporary (server busy). Run the same command again; only unfinished windows are sent. |
+| `scribe correct`: "out of quota" on every key | The free daily limit is used up. Run the same command tomorrow; finished windows are kept. |
+| `scribe correct`: a window "failed" | Usually temporary (server busy). Run the same command again; only unfinished windows are sent. |
 | Wrong name on a phone speaker | Listen to `speaker_samples\`, then fix it with B.3. Enrolling more Craig sessions (B.1) improves future matches. |
+| UI says "No language model could answer" | Gemini is out of calls and Ollama isn't running. Start Ollama (D.5), or wait for the daily reset. The sources are still shown. |
+| UI says "The archive is empty" | Add files to `data\documents\` and press **Re-index** (or `scribe rag ingest`). |
+| A PDF gives 0 passages | It's scanned; see D.8. |
+| Answers miss something you know is there | `scribe rag search "..."` to see what retrieval finds. Try the other mode (One-step / Multi-step), or name the thing exactly as it's written. |
+| Transcribing while `scribe serve` runs is slow | The archive's models use about 2.5 GB of VRAM. Stop the server while transcribing. |
 
 ---
 
@@ -332,15 +433,19 @@ python llm_correct.py -o out-phone-session1 --audio "session.m4a"
 ```powershell
 .\.venv-qwencleo\Scripts\Activate.ps1
 
-# Craig zip
-python craig_transcribe.py "SESSION.zip" -o out-SESSION --speaker-map speaker_map.txt
-python craig_transcribe.py --rewrite-outputs -o out-SESSION --speaker-map speaker_map.txt
+# Craig zip (put it in data\recordings first)
+scribe craig "data\recordings\SESSION.zip"
+scribe craig --rewrite-outputs -o data\transcripts\SESSION_ID
 
 # Phone recording
-python phone_transcribe.py --enroll "CRAIG.zip" --speaker-map speaker_map.txt   # add voices (optional)
-python phone_transcribe.py "SESSION.m4a" -o out-phone-SESSION --num-speakers 5
-python phone_transcribe.py --rewrite-outputs -o out-phone-SESSION --speaker-map phone_names.txt
+scribe phone --enroll "data\recordings\CRAIG.zip" --speaker-map config\speaker_map.txt   # add voices (optional)
+scribe phone "data\recordings\SESSION.m4a" --num-speakers 5
+scribe phone --rewrite-outputs -o data\transcripts\phone-SESSION --speaker-map config\phone_names.txt
 
 # Gemini correction (after either of the above; keys in .env)
-python llm_correct.py -o out-SESSION --audio "SESSION.zip" --speaker-map speaker_map.txt
+scribe correct -o data\transcripts\SESSION_ID --audio "data\recordings\SESSION.zip"
+
+# Archive
+scribe rag ingest         # after adding documents or transcripts
+scribe serve              # chat UI on http://127.0.0.1:8000
 ```

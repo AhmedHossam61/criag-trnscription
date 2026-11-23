@@ -1,18 +1,19 @@
 # Craig Transcriber
 
-Turns recordings of our Dungeons & Dragons sessions into readable transcripts, with
-each line credited to the player who said it. Built for **Egyptian Arabic mixed with
-English** ("انت شايف المصباح، but it doesn't seem that they have noticed you"), and
-runs locally on an 8 GB GPU.
+Turns recordings of our Dungeons & Dragons sessions into readable transcripts,
+with each line credited to the player who said it, and lets you **ask questions**
+about the sessions, rulebooks and campaign notes in a chat UI that cites its
+sources. Built for **Egyptian Arabic mixed with English** ("انت شايف المصباح، but
+it doesn't seem that they have noticed you"), and runs locally on an 8 GB GPU.
 
-It handles two kinds of recording:
-
-| Recording | Script | How speakers are known |
+| You have | Command | What you get |
 |---|---|---|
-| **Craig** (Discord bot): a zip with one audio track per player | `craig_transcribe.py` | Each track is one Discord user, renamed with `speaker_map.txt` |
-| **One mixed recording**: a phone on the table, a Zoom export, ... | `phone_transcribe.py` | Detected from the audio, then named by matching voices to profiles learned from Craig sessions |
+| A **Craig** zip from Discord (one track per player) | `scribe craig` | Transcript; speakers from Discord usernames via `config/speaker_map.txt` |
+| **One mixed recording** (phone on the table, Zoom export) | `scribe phone` | Transcript; speakers detected from the audio and named by voice |
+| A finished transcript | `scribe correct` | Names, D&D terms and slang fixed by Gemini listening to the audio |
+| Documents + transcripts | `scribe serve` / `scribe rag` | A chat that answers from your files, with citations |
 
-**→ Step-by-step instructions are in [GUIDE.md](GUIDE.md).**
+**→ Step-by-step instructions are in [docs/GUIDE.md](docs/GUIDE.md).**
 
 ---
 
@@ -21,100 +22,127 @@ It handles two kinds of recording:
 ```powershell
 .\.venv-qwencleo\Scripts\Activate.ps1
 
-# A Craig recording
-python craig_transcribe.py "session.zip" -o out-session --speaker-map speaker_map.txt
+# Transcribe a Craig recording -> data/transcripts/<recording id>/
+scribe craig "data\recordings\craig-v3owGZBtlLQA-....sesx.zip"
 
-# A phone recording (voice profiles in voices.npz are already built)
-python phone_transcribe.py "session.m4a" -o out-phone-session --num-speakers 5
+# Ask questions: put PDFs / notes in data\documents, index, start the UI
+scribe rag ingest
+scribe serve            # http://127.0.0.1:8000
 ```
 
-Open `transcript.txt` in the output folder:
+A transcript reads like this:
 
 ```
 [00:00:27.827] Dungeon Master:
   [mixed] ما انا متحركين في اتجاه المعاكس فانت you can't really tell ان it's not very bright
   [mixed] even with your dark vision يعني انت شايف المصباح ...
-
-[00:01:01.340] Kael:
-  اه استنىهم يبعدوا شويه وبعدين هبرسيد ...
 ```
 
-`[en]` / `[mixed]` mark lines with English, so code-switches are easy to find. Each
-run also writes `.srt` subtitles (play them next to the audio in VLC) and a `.json` file.
+The chat UI ("Lorekeeper") shows each answer with numbered citations, how the
+question was routed (one search or several), and the source passages with their
+relevance scores.
 
 ---
 
 ## How it works
 
-### Craig recordings
-1. **Split by player for free.** Craig gives one track per player, and Discord writes
-   exact digital silence when someone isn't talking. So "who spoke when" is known
-   exactly, and only real speech is sent to the GPU.
-2. **Cut into sentences.** A player's speech is split at pauses of 1.5 s or longer,
-   capped at 28 s per chunk.
-3. **Transcribe in batches.** [QwenCleo-ASR](https://huggingface.co/mohammedaly22/QwenCleo-ASR)
-   is a Qwen3-ASR 1.7B model fine-tuned on Egyptian Arabic with English code-switching.
-   It keeps English words in Latin script. Chunks of similar length are batched
-   together on the GPU (about 4× realtime on an RTX 3050).
-4. **Filter hallucinations.** Near-silent chunks (mic hiss) are skipped. Known invented
-   phrases, repetition loops and text too long for the audio are dropped into
-   `dropped.txt`.
+### Transcription
+1. **Who spoke when.** Craig gives one track per player, with exact digital
+   silence when someone isn't talking, so speaker and speech timing are known
+   exactly. A phone recording is split into speakers first (pyannote, or a
+   built-in Silero VAD + voice embeddings + clustering), and each speaker is named
+   by matching their voice against profiles learned from Craig sessions (96% of
+   speaking time credited correctly in a test).
+2. **Transcribe.** [QwenCleo-ASR](https://huggingface.co/mohammedaly22/QwenCleo-ASR),
+   a Qwen3-ASR 1.7B model fine-tuned on Egyptian Arabic with English
+   code-switching, keeps English in Latin script. Chunks of similar length are
+   batched on the GPU.
+3. **Filter hallucinations.** Near-silent chunks and clips with little speech are
+   skipped; known invented phrases, repetition loops and sentences repeated by
+   every player are dropped into `dropped.txt`.
+4. **Correct (optional).** Gemini gets 30 minutes of audio at a time with the
+   transcript lines and a glossary, and returns only the lines it hears are wrong.
 
-### Phone recordings
-1. **Who spoke when.** [pyannote](https://huggingface.co/pyannote/speaker-diarization-community-1)
-   is used when a Hugging Face token is set. Otherwise a built-in detector runs: Silero
-   voice detection, then voice embeddings, then clustering.
-2. **Who is who.** Each detected speaker's voice is compared with profiles
-   (`voices.npz`) learned from the players' clean Craig tracks. Groups that match the
-   same player are merged, which handles the DM's NPC voices.
-3. **Transcribe.** Same model, batching, filters and resume as above.
+### The archive (RAG)
 
-In a test on a simulated phone mix of a real session, the built-in detector credited
-**96%** of speaking time to the right player.
+```
+question ─► router ─┬─ one-step ──► hybrid search ─► rerank ──────────────────┐
+  (classifier on    │                                                          ├─► LLM answer
+   the question's   └─ multi-step ─► LLM plans sub-queries ─► search each ─────┤   with [n]
+   embedding)                        ─► one follow-up round if something's missing   citations
+```
+
+- **Passages.** Documents are cut into ~220-word passages under their headings
+  (PDF pages, Markdown and Word headings); transcripts into windows of up to two
+  minutes of consecutive lines.
+- **Hybrid search.** `BAAI/bge-m3` embeddings (multilingual: an Arabic question
+  finds English text) fused with BM25 keyword search (exact names like "Arnok")
+  by reciprocal rank fusion.
+- **Reranker.** `BAAI/bge-reranker-v2-m3`, a cross-encoder that reads question
+  and passage together, reorders the shortlist.
+- **Router.** Logistic regression over the question's embedding plus a few
+  keyword counts, trained on `config/router_examples.jsonl` in under a second.
+  `scribe rag router-eval` reports its accuracy.
+- **LLM.** Gemini (free daily quota, keys rotate) with automatic fallback to a
+  local model through Ollama.
+- **Incremental index.** Only new or changed files are embedded again.
 
 ---
 
-## Features
-- **Resume anywhere.** Stop with `Ctrl+C`, then run the same command again.
-- **Safe output folders.** A script refuses to mix two recordings, or two
-  incompatible settings, in one output folder.
-- **Rename without re-transcribing.** `--rewrite-outputs` re-applies names and
-  filters in seconds.
-- **Quick trial runs.** `--limit 300` does only the first 5 minutes; `--dry-run`
-  analyses without transcribing.
-- **Checking phone speakers by ear.** `speaker_samples\` gets a short clip per speaker.
-- **Other models.** `--backend` also offers `qwen3asr`, `cohere` and `faster-whisper`,
-  each in its own environment (`setup.cmd <backend>`).
+## Project layout
 
----
-
-## Project files
-
-| File | Purpose |
-|---|---|
-| `craig_transcribe.py` | Transcribe a Craig zip |
-| `phone_transcribe.py` | Transcribe one mixed recording; `--enroll` builds voice profiles |
-| `llm_correct.py` | Optional pass: Gemini listens to the audio and fixes misheard names, terms and slang |
-| `glossary.txt` | Campaign names and terms for the Gemini pass |
-| `speaker_map.txt` | Discord username → character name (`SKIP` for bots) |
-| `voices.npz` | Voice profiles of the players (not in git: personal data) |
-| `GUIDE.md` | How to run everything, options, troubleshooting |
-| `setup.cmd` / `setup.sh` | Create the environment for a backend |
-| `requirements-*.txt` | Dependencies per backend |
-| `plan.md`, `info.md` | Design notes and session log |
+```
+.
+├── pyproject.toml              package, dependencies, the `scribe` command
+├── config/
+│   ├── speaker_map.txt         Discord username -> character name (SKIP for bots)
+│   ├── glossary.txt            campaign names and terms for the Gemini correction
+│   ├── hotwords.txt            vocabulary hints for the qwen3asr / whisper backends
+│   ├── rag.toml                archive settings: models, retrieval, router, LLMs
+│   └── router_examples.jsonl   questions labelled one-step / multi-step
+├── data/
+│   ├── recordings/             Craig zips, phone audio            (not in git)
+│   ├── transcripts/<id>/       one folder per transcribed session
+│   ├── experiments/            trial runs, kept out of the archive
+│   ├── documents/              files the archive answers from
+│   ├── index/                  the archive's index                (not in git)
+│   └── voices.npz              players' voice profiles             (not in git)
+├── docs/
+│   ├── GUIDE.md                how to run everything
+│   └── notes/                  design notes and session log
+├── requirements/               per-backend speech dependencies
+├── scripts/setup.cmd, setup.sh create the environment for a backend
+├── src/craig_transcriber/
+│   ├── cli/                    `scribe craig | phone | correct | rag | serve`
+│   ├── transcription/          audio, chunking, ASR backends, filters, outputs, phone diarization
+│   ├── correction/             the Gemini correction pass
+│   ├── llm/                    Gemini and Ollama providers, API key pool
+│   ├── rag/                    documents, chunking, index, models, router, retriever, engine
+│   └── server/                 FastAPI app and the chat UI (static/)
+└── tests/                      pytest suite; runs in seconds with fake models
+```
 
 ---
 
 ## Requirements
 - Windows or Linux, an NVIDIA GPU (8 GB is enough), Python 3.12
 - `ffmpeg` and `uv` on the PATH
-- Optional: a free Hugging Face token for pyannote (see [GUIDE.md](GUIDE.md#b4-better-speaker-detection-with-pyannote-optional-recommended))
+- For the archive's answers: a free Gemini API key in `.env` (see `.env.example`),
+  and/or [Ollama](https://ollama.com) for a local model
+- Optional: a free Hugging Face token for pyannote (see the [guide](docs/GUIDE.md#b4-better-speaker-detection-with-pyannote-optional-recommended))
+
+Setup: `scripts\setup.cmd qwencleo` (creates `.venv-qwencleo` and installs the project).
+Tests: `python -m pytest`.
 
 ## Limitations
 - **Fantasy names get misheard.** Invented names and D&D terms are often wrong
-  ("lights" for "knights").
-- **Some invented lines still get through.** On very quiet audio the model can still
-  produce a short sentence that wasn't said; `dropped.txt` shows what the filters caught.
-- **Phone recordings are harder than Craig.** Overlapping speech goes to the loudest
-  person, far or quiet players get less accurate text, and a speaker may be
-  mislabelled at fast back-and-forth.
+  until `scribe correct` runs with a good glossary.
+- **Some invented lines still get through.** On very quiet audio the model can
+  still produce a short sentence that wasn't said; `dropped.txt` shows what the
+  filters caught.
+- **Phone recordings are harder than Craig.** Overlapping speech goes to the
+  loudest person, and a speaker may be mislabelled at fast back-and-forth.
+- **The archive only knows what's in the files.** Scanned PDFs need OCR first,
+  and answers about sessions are only as good as their transcripts.
+- **Free Gemini quota is small.** About 20 calls per key per day, shared between
+  corrections and answers; a multi-step question uses 2–3. Ollama has no limit.

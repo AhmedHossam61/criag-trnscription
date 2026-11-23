@@ -1,0 +1,78 @@
+# Settings for the question-answering archive (scribe rag / scribe serve).
+# Paths are relative to the project root. Every key is optional: a missing
+# key keeps the default shown here.
+
+[sources]
+# Your files: rulebooks, campaign notes, character sheets, ...
+# .md .txt .pdf .docx .html are read; anything else is ignored.
+documents = "data/documents"
+# Session transcripts (each folder with a transcript.json). "" leaves them out.
+transcripts = "data/transcripts"
+
+[chunking]
+# A passage is about this many words; neighbours share `overlap_words`.
+chunk_words = 220
+overlap_words = 40
+# Transcripts are cut into windows of at most this many seconds / words.
+transcript_window_s = 120
+transcript_words = 220
+
+[embedding]
+# Multilingual, so Arabic questions find English text and the other way round.
+model = "BAAI/bge-m3"
+pooling = "cls"            # cls | mean | last  (bge-m3: cls, e5: mean, Qwen3-Embedding: last)
+query_prefix = ""          # e5 wants "query: ", Qwen3-Embedding an instruction
+passage_prefix = ""        # e5 wants "passage: "
+max_length = 1024
+batch_size = 16
+device = "auto"            # auto | cuda | cpu
+
+[retrieval]
+dense_k = 40               # nearest passages by meaning
+keyword_k = 40             # best passages by exact words (BM25): names, spells, numbers
+candidates = 30            # merged shortlist handed to the reranker
+final_k = 6                # passages the answer is written from (one-step)
+
+[reranker]
+# A cross-encoder reads question and passage together; slower, much more accurate.
+enabled = true
+model = "BAAI/bge-reranker-v2-m3"
+max_length = 512
+batch_size = 8
+
+[router]
+# Decides whether a question needs one search or several.
+#   classifier: a small model trained on config/router_examples.jsonl (default)
+#   heuristic:  keyword rules only, no training
+#   single / multi: always that
+mode = "classifier"
+threshold = 0.5            # P(multi-step) at or above this -> multi-step
+examples = "config/router_examples.jsonl"
+
+[multistep]
+max_subqueries = 4         # sub-questions the planner may split a question into
+max_hops = 2               # 2 = one follow-up search if the first round left gaps
+per_query_k = 4            # passages kept per sub-question
+max_context = 10           # passages the final answer is written from
+
+[llm]
+# Tried in order; the next one takes over when one is out of quota or not running.
+# "gemini" uses the GEMINI_API keys in .env; "ollama" a local model (ollama pull <model>).
+providers = ["gemini", "ollama"]
+temperature = 0.2
+history_turns = 3          # earlier questions and answers shown to the model
+
+[llm.gemini]
+model = "gemini-2.5-flash"
+daily_limit = 20           # calls per key per day (free tier); shared with scribe correct
+# thinking_budget = 0      # uncomment to switch off thinking on 2.5 models: faster answers
+
+[llm.ollama]
+model = "qwen3:4b"
+url = "http://localhost:11434"
+# think = false            # qwen3 thinks before answering unless this is false
+
+[server]
+host = "127.0.0.1"
+port = 8000
+max_upload_mb = 50

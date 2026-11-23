@@ -3,7 +3,7 @@
 # This is deliberately tiny. Everything heavy is imported lazily inside the
 # ASR backends, so with just this installed you can already run:
 #
-#     python craig_transcribe.py recording.zip -o out/ --dry-run
+#     scribe craig data/recordings/recording.zip --dry-run
 #
 # which segments all tracks and reports speech minutes without touching a GPU.
 #

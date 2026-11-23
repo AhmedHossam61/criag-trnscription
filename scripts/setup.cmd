@@ -1,19 +1,22 @@
 @echo off
 REM Create an isolated venv for one ASR backend. Windows CMD. Uses uv.
 REM
-REM   setup.cmd qwencleo             recommended for Egyptian + code-switching
-REM   setup.cmd cohere
-REM   setup.cmd qwen3asr
-REM   setup.cmd faster-whisper
+REM   scripts\setup.cmd qwencleo             recommended for Egyptian + code-switching
+REM   scripts\setup.cmd cohere
+REM   scripts\setup.cmd qwen3asr
+REM   scripts\setup.cmd faster-whisper
 REM
-REM   set CUDA=cu128 && setup.cmd qwencleo       override the wheel index
-REM   set PYTAG=3.12 && setup.cmd qwencleo       force a specific Python version
+REM   set CUDA=cu128 && scripts\setup.cmd qwencleo       override the wheel index
+REM   set PYTAG=3.12 && scripts\setup.cmd qwencleo       force a specific Python version
 REM
 REM One venv per backend on purpose: the backends need different torch and
 REM transformers versions. Sharing one environment is how you end up
 REM reinstalling torch at 3am.
 
 setlocal EnableDelayedExpansion
+
+REM Run from the project root, wherever the script is called from.
+cd /d "%~dp0.."
 
 set "BACKEND=%~1"
 if "%CUDA%"=="" set "CUDA=cu126"
@@ -102,7 +105,7 @@ echo ^>^> installing qwencleo-asr (--no-deps)
 %UV_PIP% qwencleo-asr --no-deps
 if errorlevel 1 goto :failed
 echo ^>^> installing remaining deps
-%UV_PIP% -r requirements-qwencleo.txt
+%UV_PIP% -r requirements\qwencleo.txt
 if errorlevel 1 goto :failed
 goto :verify
 
@@ -112,7 +115,7 @@ echo ^>^> installing torch (%CUDA%)
 if errorlevel 1 goto :failed_torch
 call :verify_cuda
 if errorlevel 1 goto :failed_cuda
-%UV_PIP% -r requirements-qwen3asr.txt
+%UV_PIP% -r requirements\qwen3asr.txt
 if errorlevel 1 goto :failed
 goto :verify
 
@@ -122,7 +125,7 @@ echo ^>^> installing torch (%CUDA%)
 if errorlevel 1 goto :failed_torch
 call :verify_cuda
 if errorlevel 1 goto :failed_cuda
-%UV_PIP% -r requirements-cohere.txt
+%UV_PIP% -r requirements\cohere.txt
 if errorlevel 1 goto :failed
 echo.
 echo ^>^> NOTE: these weights are gated.
@@ -133,17 +136,21 @@ goto :verify
 
 :inst_whisper
 REM CTranslate2 based -- no torch needed at all.
-%UV_PIP% -r requirements-whisper.txt
+%UV_PIP% -r requirements\whisper.txt
 if errorlevel 1 goto :failed
 goto :verify
 
 :verify
 echo.
+echo ^>^> installing this project (scribe command, chat UI, archive)
+%UV_PIP% -e ".[rag,server,correct]"
+if errorlevel 1 goto :failed
 echo ^>^> verifying
-"%VENV%\Scripts\python.exe" craig_transcribe.py --check-env --backend %BACKEND%
+"%VENV%\Scripts\scribe.exe" craig --check-env --backend %BACKEND%
 echo.
 echo Done. Activate with:  %VENV%\Scripts\activate.bat
-echo Then:                 python craig_transcribe.py recording.zip -o out --backend %BACKEND%
+echo Then:                 scribe craig data\recordings\recording.zip --backend %BACKEND%
+echo Chat UI:              scribe serve
 exit /b 0
 
 :verify_cuda
@@ -164,7 +171,7 @@ echo.
 echo   2. uv resolved a CPU-only wheel (happens if the CUDA index was
 echo      unreachable). Rebuild the venv with a fresh index:
 echo          rmdir /s /q %VENV%
-echo          set CUDA=cu128 ^&^& setup.cmd %BACKEND%
+echo          set CUDA=cu128 ^&^& scripts\setup.cmd %BACKEND%
 echo.
 echo   3. Confirm the installed build is a CUDA wheel:
 echo          %VENV%\Scripts\python.exe -c "import torch; print(torch.version.cuda)"
@@ -178,12 +185,12 @@ echo.
 echo   1. The CUDA index has no wheels for Python %PYTAG%.
 echo      Python 3.13 needs torch 2.6 or newer. Try 3.12:
 echo          rmdir /s /q %VENV%
-echo          set PYTAG=3.12 ^&^& setup.cmd %BACKEND%
+echo          set PYTAG=3.12 ^&^& scripts\setup.cmd %BACKEND%
 echo.
 echo   2. That CUDA index no longer exists. cu121 was retired; current
 echo      indexes are cu126, cu128, cu129, cu130. Try:
 echo          rmdir /s /q %VENV%
-echo          set CUDA=cu128 ^&^& setup.cmd %BACKEND%
+echo          set CUDA=cu128 ^&^& scripts\setup.cmd %BACKEND%
 echo.
 echo   3. Your driver is genuinely too old. Check with nvidia-smi; a driver
 echo      supporting CUDA 12.x is needed for any cu12x build.
@@ -195,8 +202,8 @@ echo Install failed. See the uv output above.
 exit /b 1
 
 :usage
-echo usage: setup.cmd {qwencleo^|qwen3asr^|cohere^|faster-whisper}
+echo usage: scripts\setup.cmd {qwencleo^|qwen3asr^|cohere^|faster-whisper}
 echo.
-echo   set CUDA=cu128 ^&^& setup.cmd qwencleo      pick the wheel index
-echo   set PYTAG=3.12 ^&^& setup.cmd qwencleo      pick the Python version
+echo   set CUDA=cu128 ^&^& scripts\setup.cmd qwencleo      pick the wheel index
+echo   set PYTAG=3.12 ^&^& scripts\setup.cmd qwencleo      pick the Python version
 exit /b 1

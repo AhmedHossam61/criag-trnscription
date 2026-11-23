@@ -3,7 +3,7 @@
 # DO NOT `pip install -r` this on its own. QwenCleo must be installed with
 # --no-deps after torch, which a requirements file cannot express. Use:
 #
-#     setup.cmd qwencleo
+#     scriptssetup.cmd qwencleo
 #
 # ...or run these three steps by hand, in this order:
 #
@@ -27,7 +27,7 @@
 #
 #   3) its remaining runtime deps (listed below):
 #
-#      pip install -r requirements-qwencleo.txt
+#      pip install -r requirements/qwencleo.txt
 
 qwen-asr>=0.0.6
 numpy>=1.24

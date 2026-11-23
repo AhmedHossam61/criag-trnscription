@@ -218,8 +218,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Voice profiles of real people (phone_transcribe.py --enroll)
-voices.npz
-
-# Gemini correction pass: daily call counts per key (no keys stored)
-.gemini_usage.json
+# ---- project data -------------------------------------------------------
+# Recordings are large and personal; transcripts in data/transcripts are kept.
+data/recordings/
+# Voice profiles of real people (scribe phone --enroll)
+data/voices.npz
+# The archive's index is rebuilt from the files with `scribe rag ingest`.
+data/index/
+# Gemini calls per key per day (fingerprints only, no keys)
+data/.gemini_usage.json

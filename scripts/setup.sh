@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # Create an isolated venv for one ASR backend.
 #
-#   bash setup.sh qwencleo          # recommended for Egyptian + code-switching
-#   bash setup.sh cohere
-#   bash setup.sh qwen3asr
-#   bash setup.sh faster-whisper
-#   CUDA=cu124 bash setup.sh qwencleo   # override the wheel index
+#   bash scripts/setup.sh qwencleo          # recommended for Egyptian + code-switching
+#   bash scripts/setup.sh cohere
+#   bash scripts/setup.sh qwen3asr
+#   bash scripts/setup.sh faster-whisper
+#   CUDA=cu124 bash scripts/setup.sh qwencleo   # override the wheel index
 #
 # One venv per backend on purpose: QwenCleo pins torch 2.5.1 while the newer
 # transformers releases the other backends need may pull a different torch.
 # Sharing one environment is how you end up reinstalling torch at 3am.
 
 set -euo pipefail
+cd "$(dirname "$0")/.."   # run from the project root
 
 BACKEND="${1:-}"
 CUDA="${CUDA:-cu121}"
@@ -19,7 +20,7 @@ VENV=".venv-${BACKEND}"
 
 case "$BACKEND" in
     qwencleo|qwen3asr|cohere|faster-whisper) ;;
-    "")      echo "usage: bash setup.sh {qwencleo|qwen3asr|cohere|faster-whisper}" >&2; exit 1 ;;
+    "")      echo "usage: bash scripts/setup.sh {qwencleo|qwen3asr|cohere|faster-whisper}" >&2; exit 1 ;;
     *)       echo "unknown backend: $BACKEND" >&2; exit 1 ;;
 esac
 
@@ -45,17 +46,17 @@ case "$BACKEND" in
         echo ">> installing qwencleo-asr (--no-deps)"
         pip install qwencleo-asr --no-deps
         echo ">> installing remaining deps"
-        pip install -r requirements-qwencleo.txt
+        pip install -r requirements/qwencleo.txt
         ;;
     qwen3asr)
         echo ">> installing torch (${CUDA})"
         pip install torch torchaudio --index-url "$TORCH_INDEX"
-        pip install -r requirements-qwen3asr.txt
+        pip install -r requirements/qwen3asr.txt
         ;;
     cohere)
         echo ">> installing torch (${CUDA})"
         pip install torch torchaudio --index-url "$TORCH_INDEX"
-        pip install -r requirements-cohere.txt
+        pip install -r requirements/cohere.txt
         echo
         echo ">> NOTE: these weights are gated."
         echo "   1. accept the terms at"
@@ -64,14 +65,16 @@ case "$BACKEND" in
         ;;
     faster-whisper)
         # CTranslate2 based -- no torch needed at all.
-        pip install -r requirements-whisper.txt
+        pip install -r requirements/whisper.txt
         ;;
 esac
 
 echo
 echo ">> verifying"
-python craig_transcribe.py --check-env --backend "$BACKEND" || true
+pip install -e ".[rag,server,correct]"
+scribe craig --check-env --backend "$BACKEND" || true
 
 echo
 echo "Done. Activate with:  source $VENV/bin/activate"
-echo "Then:                 python craig_transcribe.py recording.zip -o out/ --backend $BACKEND"
+echo "Then:                 scribe craig data/recordings/recording.zip --backend $BACKEND"
+echo "Chat UI:              scribe serve"
