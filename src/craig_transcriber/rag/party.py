@@ -91,6 +91,18 @@ _AR = "ء-ي"
 _AR_PREFIX = rf"(?<![{_AR}])(?:[وفبلك]?ال|[وفبلك]|يا)?"
 
 
+def add_spellings(query: str, groups) -> str:
+    """Add the other spellings of any name the query uses; each group is one name's spellings."""
+    text = normalize_arabic(query)
+    extra = []
+    for terms in groups:
+        m = _matcher(terms)
+        if m and m.search(text):
+            # whole words here too: "Raddish" in the question doesn't make "Raddis" redundant
+            extra += [t for t in terms if not _matcher([t]).search(text)]
+    return f"{query} {' '.join(extra)}" if extra else query
+
+
 def _matcher(terms: list[str]) -> re.Pattern | None:
     """
     Whole words: a Latin name between non-letters; an Arabic one with at most a
@@ -151,13 +163,7 @@ class Party:
 
     def expand_query(self, query: str) -> str:
         """Add a character's other spellings to a keyword search that names them."""
-        text = normalize_arabic(query)
-        extra = []
-        for c in self.characters:
-            m = _matcher(c.terms)
-            if m and m.search(text):
-                extra += [t for t in c.terms if not re.search(re.escape(normalize_arabic(t)), text, re.I)]
-        return f"{query} {' '.join(extra)}" if extra else query
+        return add_spellings(query, (c.terms for c in self.characters))
 
     # -- files --------------------------------------------------------------
 

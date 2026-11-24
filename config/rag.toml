@@ -15,6 +15,10 @@ roster = "config/party.toml"
 # The party's comics: a folder per comic (assets/comics/<title>/01.png, 02.png, ...),
 # with an optional comic.toml for its title, summary, date and characters.
 comics = "assets/comics"
+# The glossary `scribe correct` uses. The answering model reads it too, so it
+# knows the campaign's names, and its "## Other spellings" section makes a
+# question that uses one spelling of a name search for all of them.
+glossary = "config/glossary.txt"
 
 [sources]
 # Your files: rulebooks, campaign notes, character sheets, ...

@@ -16,6 +16,7 @@ class PartyConfig:
     emblem: str = "assets/emblem"
     roster: str = "config/party.toml"  # the characters: a page each, and who is who for the LLM
     comics: str = "assets/comics"      # a folder per comic, pages in name order
+    glossary: str = "config/glossary.txt"  # campaign names: background for answers, other spellings for search
 
 
 @dataclass

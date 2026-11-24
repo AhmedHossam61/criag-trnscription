@@ -22,6 +22,7 @@ from typing import Callable, Iterator
 from ..llm.base import RESTART, LLMProvider, LLMUnavailable, ProviderChain
 from . import prompts
 from .config import RagConfig
+from .glossary import GlossaryFile
 from .index import Index, IngestReport, ingest
 from .models import CrossEncoderReranker, Embedder, Reranker, TransformerEmbedder
 from .party import Party
@@ -77,6 +78,7 @@ class RagEngine:
             config.index_dir / "router.npz",
         )
         self.party = Party(config)
+        self.glossary = GlossaryFile(config.path(config.party.glossary))
         self._lock = threading.RLock()   # guards index swaps
         self._index: Index | None = None
         self.ingesting = False
@@ -160,17 +162,24 @@ class RagEngine:
         return self.router.decide(question, vec)
 
     def _expand(self, query: str) -> str:
-        try:
-            return self.party.expand_query(query)
-        except (OSError, ValueError):   # a broken roster must not break search
-            return query
+        """A keyword search gets every spelling of the names it uses: the roster's, then the glossary's."""
+        for expand in (self.party.expand_query, lambda q: self.glossary.current.expand(q)):
+            try:
+                query = expand(query)
+            except (OSError, ValueError):   # a broken roster or glossary must not break search
+                pass
+        return query
 
     def _system(self, system: str) -> str:
         try:
             roster = self.party.describe()
         except (OSError, ValueError):
             roster = ""
-        return prompts.for_party(system, self.config.party.name, roster)
+        try:
+            glossary = self.glossary.current.text
+        except (OSError, ValueError):
+            glossary = ""
+        return prompts.for_party(system, self.config.party.name, roster, glossary)
 
     def search_query(self, question: str, history: list[dict]) -> str:
         """Fold the previous question in when this one only makes sense after it."""

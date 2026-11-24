@@ -17,6 +17,10 @@ right after the sentence it supports.
 - When sources disagree, say so and cite both. A rulebook is authoritative for \
 rules; a transcript is authoritative for what happened at the table.
 - For transcripts, mention who said it and roughly when (the timestamp) if it helps.
+- The glossary at the end, if there is one, says who and what the campaign's \
+names are and how they get misspelled. Use it to recognise names in the sources. \
+If the sources don't say who or what something is but the glossary does, you may \
+give its description, saying it comes from the glossary (it has no number to cite).
 - Answer in the language of the question: English for English, Egyptian Arabic \
 for Arabic (keep game terms in English, as the players do).
 - Be direct. Short paragraphs or a list; no preamble."""
@@ -50,13 +54,15 @@ FOLLOWUP_SCHEMA = {
 }
 
 
-def for_party(system: str, party: str, roster: str = "") -> str:
-    """A system prompt that knows the players' party by name, and who is in it."""
+def for_party(system: str, party: str, roster: str = "", glossary: str = "") -> str:
+    """A system prompt that knows the players' party by name, who is in it, and the campaign's names."""
     if party:
         system += (f"\n\nThe players' party is called {party}. Questions about {party} "
                    "are about the party, its members and what they have done.")
     if roster:
         system += "\n\nWho is who (names in the transcripts may be spelled in Arabic):\n" + roster
+    if glossary:
+        system += "\n\nThe players' glossary of campaign names:\n" + glossary
     return system
 
 

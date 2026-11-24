@@ -8,25 +8,83 @@
 
 ## Players and their characters
 Kael (player ahmedhoss61)
-Vaelor (player seifeldien) -- written فيلور in Arabic; sometimes transcribed "velor" or "Vaylor"
+Vaylor (player seifeldien) -- sometimes transcribed "velor"
 Thalion (player hazemonsif)
-Arnok (player abdoo_) -- written أرنوك in Arabic; often misheard as ارضك / الارض / قرنق / ارنق.
-  The others call Arnok's player "Noob" (نوب, e.g. "يا نوب") -- a nickname, keep it as نوب.
-Vaelor's player (seifeldien) is nicknamed "Modmen" (مدمن, e.g. "يا مدمن") -- a nickname, keep it as مدمن.
+Arnok (player abdoo_) -- written أرنوك in Arabic; often misheard as ارضك / الارض / قرنق / ارنق
 Dungeon Master / DM (geniusgamerm) -- narrates and voices NPCs; sometimes speaks in a Sa'idi accent for a character
 
 ## Companions
 Hasaneen (حسنين)
 Ronaldo Raddis the Third -- said "Ronald Radish the Third", written رونالد / راديش / رادش; nicknamed "مخلل" (pickle), keep it as مخلل
 
+## Nicknames (keep them as said)
+Arnok's player is called "Noob" (نوب, e.g. "يا نوب")
+Vaylor's player (seifeldien) is called "Modmen" (مدمن, e.g. "يا مدمن")
+
 ## Campaign names (NPCs, places, factions, items)
 The Nameless Beyond -- misheard as "The Nihilist Beyond" / "The Nemesis Beyond"
-Dahrak
 celestial shards
 the guardians
 the cult
+Arthur, the cruiser captain
+Elena the bartender from the cruiser bar
+vergil, the tiefling from the cruiser 
+lord riven blackthorne, one of the previous party members, carrier of a mysterious black ring, a fallen noble still clinging to his non-existent noble status
+village of Klifra, the first village where the party started their adventure.
+Ge'eady جعيدي the owner of the tavern in Klifra, also the current landlord for the party
+Clark the mayor of Klifra
+Marco the owner of the stable of horses
+Urlock the red orc leading a camp of orcs that the party have beaten and claimed his head
+the old man Jenkins, the party met him during their first journey to Danafor
+his sons, Aurelias and Malachar
+master Hareedy هريدي, the most famous trader in Danafor, well known across all Eldathor
+Farco, Marco's counterpart in Danafor
+Avarol Holdens, the traitor that was killed by the kingdom who used to live in Danafor
+abo-el wafa أبو الوفا the front desk man who works for Hareedy
+Chris, Hareedy's right hand man, and his protege
+Edgar and Otto, both are some of Hareedy's employees
+Sweet gallows, a village in the south west of Danafor
+big jimmy/جيمي الكبير the tavern master in sweet gallows
+Jonathan, the delivery guy in sweet gallows
+Alfonse von Asteria, the old man living alone in house in the outskirts of sweet gallows, the "last member alive of the von asteria family"
+echo shard, man-made stones that are used to channel magic to help people gain access to the arcane weaves
+the watchtower, a massive tower located near sweet gallows
+Valthoraak, the BBEG (probably)
+the primordial vestiges
+Solenia, the city with no crown
+The verdant Circle
+The Karmesin Reich
+The veiled horizon
+Dharak
+The BattleMaster
+Placcido (the Archmage of the veiled horizon)
+Regulus (the second disciple of Dharak)
+Lionel Messi (an adventurer Elf)
+Leo, a little kid who loves the party and chases their news to draw it in his little coloring book
+Helios, an old man that appears in the Temple of Dawn
+Chrono'vael, the guardian that protects the shard of Eternity
 
 
+
+
+
+
+
+## Other spellings
+# One name per line, every way it gets written, separated by " / "; the first
+# is the spelling to use. The lore site searches for all of them whenever a
+# question uses any one. (Party members' spellings live in config/party.toml.)
+Hareedy / Haridy / هريدي
+Dharak / Dahrak
+Solenia / Solenya / سولينيا
+Chrono'vael / Chronovael / Chronovail / كرونو
+Riven / Raven / ريفين / ريفن
+Regulus / ريجولس / ريجيلس / ريجولاس
+Klifra / كليفرا / كليفره
+Danafor / دنفور
+Ge'eady / جعيدي
+Abo el Wafa / أبو الوفا
+Big Jimmy / جيمي الكبير
 
 ## Game terms the players say in English
 religion check (and other checks: perception check, insight check, ...)

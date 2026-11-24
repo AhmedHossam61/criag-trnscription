@@ -277,6 +277,7 @@ The speech model gets names, D&D terms and fast slang wrong: "religion check" co
   ```
   Get keys at https://aistudio.google.com/apikey. When one key runs out of quota, the next takes over. `.env` is kept out of git.
 - **Glossary:** edit `config\glossary.txt` with your campaign's names and words (NPCs, places, items, how names get misheard). Names matter most; Gemini knows the D&D rules already.
+  The lore site reads it too. Its answering model gets the glossary as background, so it knows who an NPC is. Under `## Other spellings`, list a name's spellings on one line, separated by ` / ` (`Hareedy / Haridy / هريدي`), the preferred one first. A question that uses any of them then searches for all of them. Changes apply on the next question, with no restart or re-index.
 
 ### C.2 Run it
 
