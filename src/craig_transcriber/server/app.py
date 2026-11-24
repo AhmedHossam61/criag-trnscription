@@ -77,6 +77,25 @@ def safe_name(name: str) -> str:
     return stem[:150]
 
 
+class VersionedStatic(StaticFiles):
+    """
+    The pages link app.js and app.css with ?v=<version>. Such a link always means
+    the same file, so browsers keep it; without one they ask each time. Either way
+    an update reaches everyone on their next page load.
+    """
+
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        versioned = b"v=" in scope.get("query_string", b"")
+        response.headers["Cache-Control"] = "private, max-age=31536000, immutable" if versioned else "no-cache"
+        return response
+
+
+def assets_version() -> str:
+    """Changes whenever app.js or app.css does (checked per page load, so no restart is needed)."""
+    return format(max((STATIC / name).stat().st_mtime_ns for name in ("app.js", "app.css")), "x")
+
+
 def find_emblem(configured: Path | None) -> Path | None:
     """The emblem image, trying the usual extensions when none is given."""
     if configured is None:
@@ -138,7 +157,7 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
                 config.server.session_days)
 
     app = FastAPI(title=f"{party} lore", lifespan=lifespan)
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    app.mount("/static", VersionedStatic(directory=STATIC), name="static")
     # Pages, scripts and JSON shrink to about a quarter; images and the answer stream are left alone.
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
 
@@ -182,7 +201,8 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
         return response
 
     def login_form(error: str = "", name: str = "", status: int = 200) -> HTMLResponse:
-        body = (login_page.replace("{{error}}", html.escape(error))
+        body = (login_page.replace("{{assets}}", assets_version())
+                          .replace("{{error}}", html.escape(error))
                           .replace("{{name}}", html.escape(name))
                           .replace("{{error_hidden}}", "" if error else "hidden")
                           .replace("{{name_focus}}", "" if name else "autofocus")
@@ -191,7 +211,7 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
 
     @app.get("/", include_in_schema=False)
     def index_page():
-        return HTMLResponse(page)
+        return HTMLResponse(page.replace("{{assets}}", assets_version()), headers={"Cache-Control": "no-cache"})
 
     @app.get("/login", include_in_schema=False)
     def login_get(request: Request):

@@ -846,7 +846,9 @@ async function renderProfile(id) {
         c.full_name && c.full_name !== c.name ? el("div", { class: "full", text: c.full_name }) : null,
         c.title ? el("div", { class: "title-line", text: c.title }) : null,
         el("div", { class: "facts" }, facts.map((f) => el("span", { class: "chip", text: f }))),
-        c.aliases.length ? el("div", { class: "aliases", dir: "auto", text: `Also written ${c.aliases.join(" · ")}` }) : null)),
+        // Each spelling isolated, so a mix of Arabic and Latin names keeps its order.
+        c.aliases.length ? el("div", { class: "aliases" }, "Also written ",
+          ...c.aliases.flatMap((a, i) => [i ? " · " : "", el("bdi", { text: a })])) : null)),
     c.summary ? el("p", { class: "summary", dir: "auto", text: c.summary }) : null,
     el("div", { class: "ask-row" }, el("span", { class: "meet-label", text: "Ask" }),
       characterQuestions(c).map((q) => el("button", { class: "ask-chip", type: "button", onclick: () => askFresh(q) }, q))),

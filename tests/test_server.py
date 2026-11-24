@@ -23,8 +23,12 @@ def sse(response) -> list[dict]:
 
 
 def test_ui_and_status(client):
-    assert "{{party}}" not in client.get("/").text
-    assert client.get("/static/app.js").status_code == 200
+    page = client.get("/").text
+    assert "{{party}}" not in page and "{{assets}}" not in page
+    script = page.split('<script src="')[1].split('"')[0]
+    assert script.startswith("/static/app.js?v=")
+    assert "immutable" in client.get(script).headers["cache-control"]          # the linked version is kept
+    assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
     status = client.get("/api/status").json()
     assert status["documents"] == 3 and status["passages"] > 0 and status["llm"] == "fake-llm"
 

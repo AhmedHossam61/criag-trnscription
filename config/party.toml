@@ -68,7 +68,10 @@ aliases = ["حسنين", "حسانين", "Hassaneen"]
 [[character]]
 name = "Ronaldo Raddis the Third"
 role = "companion"
-title = ""
-summary = ""
+title = "Follower of Dahrak and scholar-adventurer"
+summary = """A young follower of Dahrak under Master Regulus, who joined the party on the road from Solenya \
+to Danafor because Regulus saw promise in Vaylor. Curious and ambitious, he casts with the hand that bears \
+a hollow-eyed emblem and carries a rapier he is still learning to use. Shy, earnest and eager to earn \
+the trust Thalion isn't ready to give him yet."""
 # "مخلل" (pickle) is the party's nickname for him.
-aliases = ["Ronaldo", "Raddis", "Ronald Radish", "Ronald Radish III", "Radish", "رونالدو", "رونالد", "راديش", "رادش", "مخلل"]
+aliases = ["Ronaldo", "Raddis", "Raddish", "Ronald Radish", "Ronald Radish III", "Radish", "رونالدو", "رونالد", "راديش", "رادش", "مخلل"]
