@@ -19,7 +19,7 @@ import threading
 import time
 from typing import Callable, Iterator
 
-from ..llm.base import LLMProvider, LLMUnavailable, ProviderChain
+from ..llm.base import RESTART, LLMProvider, LLMUnavailable, ProviderChain
 from . import prompts
 from .config import RagConfig
 from .index import Index, IngestReport, ingest
@@ -42,7 +42,8 @@ def build_llm(config: RagConfig) -> LLMProvider:
         if name == "gemini":
             from ..llm.gemini import GeminiProvider
             g = config.llm.gemini
-            providers.append(GeminiProvider(g.model, g.daily_limit, g.thinking_budget))
+            for model in [g.model, *g.fallback_models]:
+                providers.append(GeminiProvider(model, g.daily_limit, g.thinking_budget))
         elif name == "ollama":
             from ..llm.ollama import OllamaProvider
             o = config.llm.ollama
@@ -218,6 +219,10 @@ class RagEngine:
         try:
             for piece in self.llm.stream(self._system(prompts.ANSWER_SYSTEM), prompt,
                                          temperature=self.config.llm.temperature):
+                if piece is RESTART:        # that model broke off; the next one starts over
+                    answer.clear()
+                    yield {"type": "restart"}
+                    continue
                 answer.append(piece)
                 yield {"type": "token", "text": piece}
         except LLMUnavailable as exc:

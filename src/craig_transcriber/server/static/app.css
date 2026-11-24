@@ -262,6 +262,7 @@ img.sigil { width: 46px; height: 46px; object-fit: cover; border-radius: 9px; bo
   border: 1px solid var(--danger); background: var(--danger-soft); color: var(--danger);
   border-radius: var(--radius); padding: 10px 12px; font-size: var(--step--1);
 }
+.retry-row { display: flex; gap: 8px; }
 .answer-foot { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: 0.75rem; color: var(--ink-3); }
 .answer-foot button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: 0.75rem; }
 .answer-foot .num { font-variant-numeric: tabular-nums; }

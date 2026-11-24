@@ -12,6 +12,13 @@ class LLMUnavailable(RuntimeError):
     """The provider can't answer right now (no key, quota used up, server down)."""
 
 
+class Restart(str):
+    """Yielded by ProviderChain.stream when an answer broke off and the next provider starts over."""
+
+
+RESTART = Restart("")
+
+
 class LLMProvider:
     name = "base"
 
@@ -32,8 +39,9 @@ class LLMProvider:
 class ProviderChain(LLMProvider):
     """
     Try each provider in order. A provider that fails with LLMUnavailable
-    before producing any text hands over to the next one; `last_used` names
-    the one that answered.
+    hands over to the next one; `last_used` names the one that answered. If it
+    fails partway through an answer, the stream yields RESTART first, so the
+    caller drops the half answer before the next provider starts over.
     """
     name = "chain"
 
@@ -55,7 +63,7 @@ class ProviderChain(LLMProvider):
                 self.last_used = provider.describe()
                 return text
             except LLMUnavailable as exc:
-                errors.append(f"{provider.name}: {exc}")
+                errors.append(f"{getattr(provider, 'model', provider.name)}: {exc}")
         raise LLMUnavailable("; ".join(errors))
 
     def stream(self, system: str, prompt: str, *, temperature: float = 0.2) -> Iterator[str]:
@@ -70,7 +78,7 @@ class ProviderChain(LLMProvider):
                     yield piece
                 return
             except LLMUnavailable as exc:
-                if started:
-                    raise
-                errors.append(f"{provider.name}: {exc}")
+                errors.append(f"{getattr(provider, 'model', provider.name)}: {exc}")
+                if started and provider is not self.providers[-1]:
+                    yield RESTART
         raise LLMUnavailable("; ".join(errors))

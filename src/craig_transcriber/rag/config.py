@@ -77,6 +77,7 @@ class MultistepConfig:
 @dataclass
 class GeminiConfig:
     model: str = "gemini-2.5-flash"
+    fallback_models: list[str] = field(default_factory=list)  # tried in order when `model` is down
     daily_limit: int = 20
     thinking_budget: int | None = None
 

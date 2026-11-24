@@ -82,6 +82,9 @@ history_turns = 3          # earlier questions and answers shown to the model
 # asking questions needs. "-latest" follows Google's current Flash-Lite.
 # scribe correct keeps its own model and its own count.
 model = "gemini-flash-lite-latest"
+# When it's overloaded ("503 ... high demand") even after two retries, these
+# answer instead, in order; then Ollama. Each has its own daily count.
+fallback_models = ["gemini-flash-latest", "gemini-2.5-flash"]
 daily_limit = 500          # calls per key per day; see your real limit at aistudio.google.com/rate-limit
 # thinking_budget = 0      # uncomment to switch off thinking on 2.5 models: faster answers
 

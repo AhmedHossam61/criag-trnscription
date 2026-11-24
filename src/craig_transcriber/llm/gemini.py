@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from typing import Iterator
 
 from .base import LLMProvider, LLMUnavailable
 from .keys import KeyPool, api_keys
 
 DEFAULT_MODEL = "gemini-2.5-flash"
+# Waits before trying again when Google is overloaded ("503 UNAVAILABLE ... high demand").
+RETRY_DELAYS = (2.0, 5.0)
 
 
 def make_client(key: str):
@@ -20,6 +23,11 @@ def make_client(key: str):
 
 def is_quota_error(exc: Exception) -> bool:
     return getattr(exc, "code", None) == 429 or "RESOURCE_EXHAUSTED" in str(exc)
+
+
+def is_transient(exc: Exception) -> bool:
+    """Google's side is busy or hiccuping; the same call usually works seconds later."""
+    return getattr(exc, "code", None) in (500, 502, 503, 504) or         any(s in str(exc) for s in ("UNAVAILABLE", "overloaded", "DEADLINE_EXCEEDED"))
 
 
 def safety_off():
@@ -70,6 +78,7 @@ class GeminiProvider(LLMProvider):
 
     def complete(self, system: str, prompt: str, *, schema: dict | None = None,
                  temperature: float = 0.2) -> str:
+        waits = list(RETRY_DELAYS)
         while True:
             label, client = self._client()
             self.pool.count_call(label)
@@ -82,6 +91,9 @@ class GeminiProvider(LLMProvider):
                 if is_quota_error(exc):
                     self.pool.mark_exhausted(label)
                     continue
+                if is_transient(exc) and waits:
+                    time.sleep(waits.pop(0))
+                    continue
                 raise LLMUnavailable(f"{type(exc).__name__}: {str(exc)[:300]}") from exc
             if not response.text:
                 reason = response.candidates[0].finish_reason if response.candidates else "no candidates"
@@ -89,6 +101,7 @@ class GeminiProvider(LLMProvider):
             return response.text
 
     def stream(self, system: str, prompt: str, *, temperature: float = 0.2) -> Iterator[str]:
+        waits = list(RETRY_DELAYS)
         while True:
             label, client = self._client()
             self.pool.count_call(label)
@@ -105,5 +118,8 @@ class GeminiProvider(LLMProvider):
             except Exception as exc:  # noqa: BLE001
                 if is_quota_error(exc) and not started:
                     self.pool.mark_exhausted(label)
+                    continue
+                if is_transient(exc) and not started and waits:
+                    time.sleep(waits.pop(0))
                     continue
                 raise LLMUnavailable(f"{type(exc).__name__}: {str(exc)[:300]}") from exc

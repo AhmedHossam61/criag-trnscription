@@ -229,12 +229,28 @@ function renderTurn(conv, i) {
   if (msg.model) foot.append(el("span", { text: msg.model }));
   if (msg.timing) foot.append(el("span", { class: "num", text: `${msg.timing.total_s}s` }));
   if (msg.stopped) foot.append(el("span", { text: "Stopped" }));
+  // The latest answer can be asked again: prominently when it failed, quietly when it didn't.
+  const last = i === conv.messages.length - 1 && !msg.pending;
+  const failed = Boolean(msg.error || msg.stopped);
+  if (last && !failed) foot.append(el("button", { type: "button", onclick: () => regenerate(i) }, "Regenerate"));
 
   return el("section", { class: "turn", id: `m-${i}` },
     el("div", { class: "who" }, "Lore", routeChips(msg)),
     body,
     msg.error ? el("div", { class: "error-box", role: "alert", text: msg.error }) : null,
+    last && failed ? el("div", { class: "retry-row" },
+      el("button", { class: "btn", type: "button", onclick: () => regenerate(i) }, "Try again")) : null,
     foot.childNodes.length ? foot : null);
+}
+
+// Drop the latest question and its answer, then ask it again with the same history.
+function regenerate(i) {
+  const conv = current();
+  if (!conv || state.controller || i !== conv.messages.length - 1) return;
+  const question = conv.messages[i - 1] && conv.messages[i - 1].content;
+  if (!question) return;
+  conv.messages.splice(i - 1);
+  ask(question);
 }
 
 function renderWelcome() {
@@ -466,6 +482,7 @@ async function ask(question) {
       else if (ev.type === "plan") { msg.plans.push(ev); renderCatalog(); }
       else if (ev.type === "sources") { msg.sources = ev.sources; renderCatalog(); }
       else if (ev.type === "token") msg.content += ev.text;
+      else if (ev.type === "restart") msg.content = "";
       else if (ev.type === "done") { msg.content = ev.answer; msg.model = ev.model; msg.timing = ev.timing; }
       else if (ev.type === "error") msg.error = ev.message;
       refresh();

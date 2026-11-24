@@ -1,4 +1,6 @@
-from craig_transcriber.llm.base import LLMUnavailable, ProviderChain
+import pytest
+
+from craig_transcriber.llm.base import RESTART, LLMUnavailable, ProviderChain
 from craig_transcriber.rag.engine import RagEngine, heuristic_split
 from craig_transcriber.rag.router import QueryRouter, heuristic_probability, load_examples
 from craig_transcriber.paths import CONFIG_DIR
@@ -102,6 +104,55 @@ def test_provider_chain_falls_back():
     chain = ProviderChain([Down(), FakeLLM()])
     assert "".join(chain.stream("s", "p")).startswith("The cult")
     assert chain.last_used == "fake-llm"
+
+
+def test_chain_starts_over_when_an_answer_breaks_off():
+    class BreaksOff(FakeLLM):
+        name = "flaky"
+        model = "gemini-flash-lite-latest"
+
+        def stream(self, *a, **k):
+            yield "The cult wa"
+            raise LLMUnavailable("503 UNAVAILABLE")
+
+    pieces = list(ProviderChain([BreaksOff(), FakeLLM()]).stream("s", "p"))
+    assert pieces[:2] == ["The cult wa", RESTART] and "".join(pieces[2:]).startswith("The cult wants")
+
+    with pytest.raises(LLMUnavailable, match="gemini-flash-lite-latest: 503"):
+        list(ProviderChain([BreaksOff(), FakeLLM(fail=True)]).stream("s", "p"))
+
+
+def test_gemini_retries_when_google_is_overloaded(monkeypatch):
+    from craig_transcriber.llm import gemini
+
+    class Busy(Exception):
+        code = 503
+
+    calls = []
+
+    class Models:
+        def generate_content(self, **kw):
+            calls.append(kw["model"])
+            if len(calls) < 3:
+                raise Busy("503 UNAVAILABLE. This model is currently experiencing high demand.")
+            return type("R", (), {"text": "answer", "candidates": []})()
+
+    class Pool:
+        keys = ["k"]
+        def current(self): return "key 1", type("C", (), {"models": Models()})()
+        def count_call(self, label): pass
+        def mark_exhausted(self, label): raise AssertionError("a busy server is not a used-up quota")
+
+    monkeypatch.setattr(gemini, "RETRY_DELAYS", (0, 0))
+    monkeypatch.setattr(gemini.GeminiProvider, "_config", lambda *a: None)
+    provider = gemini.GeminiProvider.__new__(gemini.GeminiProvider)
+    provider.model, provider.thinking_budget, provider.pool = "m", None, Pool()  # type: ignore[assignment]
+    assert provider.complete("s", "p") == "answer" and len(calls) == 3
+
+    calls.clear()
+    monkeypatch.setattr(gemini, "RETRY_DELAYS", (0,))
+    with pytest.raises(LLMUnavailable, match="high demand"):
+        provider.complete("s", "p")
 
 
 def test_heuristic_split():
