@@ -256,7 +256,7 @@ function regenerate(i) {
 function renderWelcome() {
   const empty = state.status && state.status.passages === 0;
   const box = el("div", { class: "welcome" },
-    state.status && state.status.emblem ? el("img", { class: "crest", src: "/emblem", alt: `${partyName()} crest` }) : null,
+    state.status && state.status.emblem ? el("img", { class: "crest", src: sizedImage(state.status.emblem, 384), alt: `${partyName()} crest` }) : null,
     el("h2", { text: empty ? `${partyName()}'s lore is empty` : `Ask about ${partyName()}'s lore` }),
     el("p", { text: empty
       ? "Add your lore, campaign notes, character sheets or rulebooks in the Library. Session transcripts in data/transcripts are added when you re-index."
@@ -277,7 +277,7 @@ function renderWelcome() {
         companions().length ? el("a", { href: "#companions", class: "comp" },
           el("span", { class: "avatar-stack" }, companions().slice(0, 3).map((c) => avatar(c, "xs"))), "Companions") : null,
         state.comics && state.comics.length ? el("a", { href: "#comics", class: "comp" },
-          el("img", { class: "avatar xs cover", src: state.comics[0].pages[0], alt: "", loading: "lazy" }), "Comics") : null)));
+          el("img", { class: "avatar xs cover", src: sizedImage(state.comics[0].pages[0], 96), alt: "", loading: "lazy" }), "Comics") : null)));
   }
   return box;
 }
@@ -372,6 +372,63 @@ function renderAll() {
 /* ----------------------------------------------------------------- panels */
 
 const app = $("#app");
+
+// Side panel widths and which are hidden, remembered per browser. Wide screens
+// only: below 1180px the sources, and below 760px the left panel, slide over
+// the page instead.
+const LAYOUT_KEY = "lorekeeper.layout";
+const LAYOUT_DEFAULT = { rail: 272, catalog: 380, railHidden: false, catalogHidden: false };
+const layout = { ...LAYOUT_DEFAULT, ...storage.get(LAYOUT_KEY, {}) };
+const WIDE = "(min-width: 1181px)", NARROW = "(max-width: 760px)";
+const DESK_MIN = 360;   // the questions column never gets narrower than this
+
+function clampWidths() {
+  const room = innerWidth - DESK_MIN;
+  layout.rail = Math.round(Math.min(Math.max(layout.rail, 200), 480, room - (matchMedia(WIDE).matches ? 280 : 0)));
+  layout.catalog = Math.round(Math.min(Math.max(layout.catalog, 280), room - (layout.railHidden ? 0 : layout.rail)));
+}
+
+function applyLayout(save = true) {
+  clampWidths();
+  app.style.setProperty("--rail-w", `${layout.rail}px`);
+  app.style.setProperty("--catalog-w", `${layout.catalog}px`);
+  app.classList.toggle("rail-collapsed", layout.railHidden);
+  app.classList.toggle("catalog-collapsed", layout.catalogHidden);
+  const widened = layout.catalog >= Math.round((innerWidth - (layout.railHidden ? 0 : layout.rail)) * 0.55) - 1;
+  $("#widen-catalog").classList.toggle("on", widened);
+  $("#widen-catalog").title = $("#widen-catalog").ariaLabel = widened ? "Narrow this panel" : "Widen this panel";
+  if (save) storage.set(LAYOUT_KEY, layout);
+}
+
+function makeResizer(handle, side) {
+  const widthAt = (x) => (side === "rail" ? x : innerWidth - x);
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("active");
+    app.classList.add("resizing");
+    const move = (ev) => { layout[side] = widthAt(ev.clientX); applyLayout(false); };
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.classList.remove("active");
+      app.classList.remove("resizing");
+      applyLayout();
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up, { once: true });
+    handle.addEventListener("pointercancel", up, { once: true });
+  });
+  handle.addEventListener("dblclick", () => { layout[side] = LAYOUT_DEFAULT[side]; applyLayout(); });
+  handle.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 80 : 24;
+    const grow = side === "rail" ? "ArrowRight" : "ArrowLeft", shrink = side === "rail" ? "ArrowLeft" : "ArrowRight";
+    if (e.key !== grow && e.key !== shrink) return;
+    e.preventDefault();
+    layout[side] += e.key === grow ? step : -step;
+    applyLayout();
+  });
+}
+
 function closePanels() { app.classList.remove("rail-open", "catalog-open"); $("#scrim").hidden = true; }
 function openRail() { if (matchMedia("(max-width: 760px)").matches) { app.classList.add("rail-open"); $("#scrim").hidden = false; } }
 function openCatalog() { if (matchMedia("(max-width: 1180px)").matches) { app.classList.add("catalog-open"); $("#scrim").hidden = false; } }
@@ -585,13 +642,33 @@ const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`
 const mains = () => (state.party ? state.party.characters.filter((c) => c.role === "main") : []);
 const companions = () => (state.party ? state.party.characters.filter((c) => c.role === "companion") : []);
 
+// The server shrinks images to the width asked for (96, 192, 384 or 800 px), so a
+// 34px circle doesn't download a 600 KB painting. Twice the shown size stays sharp
+// on high-density screens.
+function sizedImage(url, width) {
+  return `${url}${url.includes("?") ? "&" : "?"}w=${width}`;
+}
+const AVATAR_WIDTH = { xs: 96, sm: 96, "": 96, lg: 192, xl: 384 };
+
 function avatar(c, size = "") {
   return c.portrait
-    ? el("img", { class: `avatar ${size}`, src: c.portrait, alt: "", loading: "lazy" })
+    ? el("img", { class: `avatar ${size}`, src: sizedImage(c.portrait, AVATAR_WIDTH[size] || 192), alt: "", loading: "lazy" })
     : el("span", { class: `avatar mono ${size}`, "aria-hidden": "true", text: (c.name.trim()[0] || "?").toUpperCase() });
 }
 
-async function loadParty() {
+// The roster and comics hardly change, so one request serves every view for a
+// minute, and calls made while it's on its way share it. Through the tunnel each
+// request is a round trip worth saving.
+const FRESH_MS = 60_000;
+function once(load) {
+  let pending = null, at = 0;
+  return () => {
+    if (!pending || Date.now() - at > FRESH_MS) { at = Date.now(); pending = load(); }
+    return pending;
+  };
+}
+
+const loadParty = once(async () => {
   try {
     state.party = await api("/api/party");
     state.partyError = null;
@@ -601,7 +678,7 @@ async function loadParty() {
   }
   renderPartyList();
   return state.party;
-}
+});
 
 function renderPartyList() {
   const view = state.view;
@@ -800,12 +877,12 @@ function renderCompanions() {
 
 /* ----------------------------------------------------------------- comics */
 
-async function loadComics() {
+const loadComics = once(async () => {
   try { state.comics = (await api("/api/comics")).comics; state.comicsError = null; }
   catch (e) { state.comics = []; state.comicsError = e.message; }
   renderPartyList();
   return state.comics;
-}
+});
 
 // The comic's characters: their portrait and a link to their page when the roster knows them.
 function castChips(comic, linked = true) {
@@ -821,7 +898,7 @@ function renderComics() {
   document.title = `Comics · ${partyName()} Lore`;
   const comics = state.comics || [];
   const grid = el("div", { class: "comic-grid" }, comics.map((m) => el("a", { class: "comic-card", href: `#comics/${m.id}` },
-    el("img", { class: "comic-cover", src: m.pages[0], alt: "", loading: "lazy" }),
+    el("img", { class: "comic-cover", src: sizedImage(m.pages[0], 800), alt: "", loading: "lazy" }),
     el("div", { class: "cc-body" },
       el("h3", { text: m.title }),
       el("div", { class: "cc-meta", text: [plural(m.pages.length, "page"), m.date].filter(Boolean).join(" · ") }),
@@ -870,7 +947,7 @@ function renderComic(id) {
       el("div", { class: "comic-thumbs" }, m.pages.map((src, n) => el("button", {
         class: "comic-thumb", type: "button", "aria-label": `Page ${n + 1}`,
         onclick: () => { closePanels(); $(`#page-${n + 1}`).scrollIntoView({ behavior: "smooth", block: "start" }); } },
-        el("img", { src, alt: "", loading: "lazy" }), el("span", { text: n + 1 }))))),
+        el("img", { src: sizedImage(src, 192), alt: "", loading: "lazy" }), el("span", { text: n + 1 }))))),
     m.characters.length ? el("div", { class: "app-group" }, el("h3", { text: "In this comic" }),
       el("div", { class: "cast-col" }, castChips(m))) : null);
 }
@@ -1009,9 +1086,27 @@ function wire() {
   $("#tab-chats").addEventListener("click", () => showTab("chats"));
   $("#tab-party").addEventListener("click", () => showTab("party"));
   $("#tab-library").addEventListener("click", () => showTab("library"));
-  $("#open-rail").addEventListener("click", () => { app.classList.add("rail-open"); $("#scrim").hidden = false; });
-  $("#open-catalog").addEventListener("click", () => { app.classList.add("catalog-open"); $("#scrim").hidden = false; });
-  $("#close-catalog").addEventListener("click", closePanels);
+  // On wide screens these hide and show the panels; on small ones they slide them over the page.
+  $("#open-rail").addEventListener("click", () => {
+    if (matchMedia(NARROW).matches) { app.classList.add("rail-open"); $("#scrim").hidden = false; }
+    else { layout.railHidden = !layout.railHidden; applyLayout(); }
+  });
+  $("#open-catalog").addEventListener("click", () => {
+    if (!matchMedia(WIDE).matches) { app.classList.add("catalog-open"); $("#scrim").hidden = false; }
+    else { layout.catalogHidden = !layout.catalogHidden; applyLayout(); }
+  });
+  $("#close-catalog").addEventListener("click", () => {
+    if (matchMedia(WIDE).matches) { layout.catalogHidden = true; applyLayout(); } else closePanels();
+  });
+  $("#widen-catalog").addEventListener("click", () => {
+    const wide = Math.round((innerWidth - (layout.railHidden ? 0 : layout.rail)) * 0.55);
+    layout.catalog = $("#widen-catalog").classList.contains("on") ? LAYOUT_DEFAULT.catalog : wide;
+    applyLayout();
+  });
+  makeResizer($("#rail-resizer"), "rail");
+  makeResizer($("#catalog-resizer"), "catalog");
+  addEventListener("resize", () => applyLayout(false));
+  applyLayout(false);
   $("#scrim").addEventListener("click", closePanels);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanels(); });
 

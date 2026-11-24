@@ -25,20 +25,24 @@ from __future__ import annotations
 import html
 import json
 import re
+import os
 import threading
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ..rag.documents import DOCUMENT_TYPES
 from ..rag.engine import RagEngine
+from ..rag.party import image_version
 from .auth import Auth, TooManyAttempts
 from .comics import cast, load_comics
+from .images import sized
 
 STATIC = Path(__file__).with_name("static")
 EMBLEM_TYPES = (".png", ".svg", ".webp", ".jpg", ".jpeg")
@@ -85,6 +89,7 @@ def find_emblem(configured: Path | None) -> Path | None:
 def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
     config = engine.config
     docs_dir = config.path(config.sources.documents)
+    image_cache = config.root / "data" / ".cache" / "images"
     state = {"warmup_error": None}
 
     def _warm() -> None:
@@ -94,14 +99,28 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
             state["warmup_error"] = f"{type(exc).__name__}: {exc}"
             traceback.print_exc()
 
+    def _warm_pages() -> None:
+        """Scan the transcripts and shrink the images now, not on someone's first visit."""
+        try:
+            engine.party.warm(engine.index.passages)
+            portraits = [p for p in map(engine.party.portrait, engine.party.characters) if p]
+            for path, widths in ([(p, (96, 192, 384)) for p in portraits] + [(emblem, (96, 384))] * bool(emblem)
+                                 + [(m.pages[0], (96, 800)) for m in load_comics(config.path(config.party.comics))]):
+                for w in widths:
+                    sized(path, w, image_cache)
+        except Exception:  # noqa: BLE001 -- the pages still work, just slower the first time
+            traceback.print_exc()
+
     @asynccontextmanager
     async def lifespan(_app):
         if warm_up:
             threading.Thread(target=_warm, daemon=True).start()
+            threading.Thread(target=_warm_pages, daemon=True).start()
         yield
 
     party = config.party.name or "The party"
     emblem = find_emblem(config.path(config.party.emblem))
+    emblem_url = f"/emblem?v={image_version(emblem)}" if emblem else None
 
     def branded(name: str) -> str:
         page = (STATIC / name).read_text(encoding="utf-8")
@@ -110,8 +129,8 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
         if emblem:
             # Swap the built-in sigil for the party's emblem, and use it as the tab icon.
             start, end = page.index("<!--sigil-->"), page.index("<!--/sigil-->") + len("<!--/sigil-->")
-            page = (page[:start] + '<img class="sigil" src="/emblem" alt="">' + page[end:])
-            page = page.replace("<!--icon-->", '<link rel="icon" href="/emblem">')
+            page = (page[:start] + f'<img class="sigil" src="{emblem_url}&amp;w=96" alt="">' + page[end:])
+            page = page.replace("<!--icon-->", f'<link rel="icon" href="{emblem_url}&amp;w=96">')
         return page
 
     page, login_page = branded("index.html"), branded("login.html")
@@ -120,6 +139,8 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
 
     app = FastAPI(title=f"{party} lore", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    # Pages, scripts and JSON shrink to about a quarter; images and the answer stream are left alone.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
 
     @app.middleware("http")
     async def require_login(request: Request, call_next):
@@ -144,6 +165,21 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
         user = request.state.user
         if auth.enabled and not (user and user.admin):
             raise HTTPException(403, "only an admin can change the library")
+
+    def send_image(request: Request, original: Path, w: int | None, v: str) -> Response:
+        """
+        An image, made smaller when the page asks for a width. A URL that names the
+        file's current version (?v=) always means the same picture, so browsers keep
+        it instead of downloading it again on every page.
+        """
+        keep = "private, max-age=31536000, immutable" if v and v == image_version(original) else "no-cache"
+        path = sized(original, w, image_cache)
+        response = FileResponse(path, stat_result=os.stat(path), headers={"Cache-Control": keep},
+                                # Windows often doesn't know .webp, and would send it untyped
+                                media_type="image/webp" if path.suffix.lower() == ".webp" else None)
+        if response.headers["etag"] in request.headers.get("if-none-match", ""):
+            return Response(status_code=304, headers={"ETag": response.headers["etag"], "Cache-Control": keep})
+        return response
 
     def login_form(error: str = "", name: str = "", status: int = 200) -> HTMLResponse:
         body = (login_page.replace("{{error}}", html.escape(error))
@@ -208,11 +244,11 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
         return engine.party.page(_character(character_id), engine.index.passages)
 
     @app.get("/api/party/{character_id}/portrait", include_in_schema=False)
-    def party_portrait(character_id: str):
+    def party_portrait(request: Request, character_id: str, w: int | None = None, v: str = ""):
         path = engine.party.portrait(_character(character_id))
         if path is None:
             raise HTTPException(404, "no portrait")
-        return FileResponse(path, headers={"Cache-Control": "no-cache"})
+        return send_image(request, path, w, v)
 
     def _comics():
         try:
@@ -227,30 +263,31 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
             roster = []
         return {"id": comic.id, "title": comic.title, "summary": comic.summary, "date": comic.date,
                 "characters": cast(comic, roster),
-                "pages": [f"/api/comics/{comic.id}/pages/{n}" for n in range(1, len(comic.pages) + 1)]}
+                "pages": [f"/api/comics/{comic.id}/pages/{n}?v={image_version(p)}"
+                          for n, p in enumerate(comic.pages, start=1)]}
 
     @app.get("/api/comics")
     def comics_list():
         return {"comics": [_comic(c) for c in _comics()]}
 
     @app.get("/api/comics/{comic_id}/pages/{number}", include_in_schema=False)
-    def comic_page(comic_id: str, number: int):
+    def comic_page(request: Request, comic_id: str, number: int, w: int | None = None, v: str = ""):
         comic = next((c for c in _comics() if c.id == comic_id), None)
         if comic is None or not 1 <= number <= len(comic.pages):
             raise HTTPException(404, "no such page")
-        return FileResponse(comic.pages[number - 1], headers={"Cache-Control": "no-cache"})
+        return send_image(request, comic.pages[number - 1], w, v)
 
     @app.get("/emblem", include_in_schema=False)
-    def emblem_file():
+    def emblem_file(request: Request, w: int | None = None, v: str = ""):
         if not emblem:
             raise HTTPException(404, "no emblem")
-        return FileResponse(emblem, headers={"Cache-Control": "no-cache"})
+        return send_image(request, emblem, w, v)
 
     @app.get("/api/status")
     def status(request: Request):
         user = request.state.user
         return engine.status() | {"warmup_error": state["warmup_error"],
-                                  "upload_types": sorted(DOCUMENT_TYPES), "emblem": emblem is not None,
+                                  "upload_types": sorted(DOCUMENT_TYPES), "emblem": emblem_url,
                                   "login": auth.enabled,
                                   "user": {"name": user.name, "admin": user.admin} if user else None}
 

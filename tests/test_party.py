@@ -100,7 +100,7 @@ def test_party_endpoints(party):
     engine.reindex(progress=lambda _: None)
     with TestClient(create_app(engine, warm_up=False)) as c:
         cards = {ch["id"]: ch for ch in c.get("/api/party").json()["characters"]}
-        assert cards["arnok"]["portrait"] == "/api/party/arnok/portrait" and cards["kael"]["portrait"] is None
+        assert cards["arnok"]["portrait"].startswith("/api/party/arnok/portrait?v=") and cards["kael"]["portrait"] is None
         assert cards["ronaldo-raddis-the-third"]["role"] == "companion"
         assert c.get("/api/party/arnok/portrait").content == b"fake-png"
         assert c.get("/api/party/ronaldo-raddis-the-third/portrait").content == b"radish"

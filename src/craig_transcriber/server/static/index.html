@@ -18,6 +18,8 @@
 <div class="app" id="app">
 
   <aside class="rail" id="rail" aria-label="Conversations and library">
+    <div class="resizer" id="rail-resizer" role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="Resize the left panel" title="Drag to resize · double-click to reset"></div>
     <div class="brand">
       <!--sigil--><!-- An eye inside a ward-stone: "vakt" is the watch, the one who keeps guard. -->
       <svg class="sigil" viewBox="0 0 32 32" aria-hidden="true">
@@ -73,12 +75,12 @@
 
   <main class="desk">
     <header class="topbar">
-      <button class="icon-btn only-narrow" id="open-rail" type="button" aria-label="Show conversations and library">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <button class="icon-btn" id="open-rail" type="button" aria-label="Show or hide the left panel" title="Show or hide the left panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M9 5v14"/></svg>
       </button>
       <h1 class="chat-title" id="chat-title">New question</h1>
-      <button class="icon-btn only-medium" id="open-catalog" type="button" aria-label="Show sources">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6z M9 10h6M9 14h6M9 18h4"/></svg>
+      <button class="icon-btn" id="open-catalog" type="button" aria-label="Show or hide sources" title="Show or hide sources">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M15 5v14"/></svg>
       </button>
       <button class="icon-btn" id="theme" type="button" aria-label="Switch theme" title="Theme: system">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 1 0 14z" class="fill"/></svg>
@@ -105,9 +107,14 @@
   </main>
 
   <aside class="catalog" id="catalog" aria-label="Sources">
+    <div class="resizer" id="catalog-resizer" role="separator" aria-orientation="vertical" tabindex="0"
+         aria-label="Resize the sources panel" title="Drag to resize · double-click to reset"></div>
     <header class="catalog-head">
       <h2 id="catalog-title">Sources</h2>
-      <button class="icon-btn only-medium" id="close-catalog" type="button" aria-label="Hide sources">
+      <button class="icon-btn only-wide" id="widen-catalog" type="button" aria-label="Widen this panel" title="Widen this panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l-5 5 5 5M5 12h14"/></svg>
+      </button>
+      <button class="icon-btn" id="close-catalog" type="button" aria-label="Hide sources" title="Hide this panel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </header>

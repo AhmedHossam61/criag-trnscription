@@ -37,7 +37,8 @@ def test_comics_endpoints(archive):
     engine = RagEngine(archive, embedder=FakeEmbedder(), reranker=FakeReranker(), llm=FakeLLM())
     with TestClient(create_app(engine, warm_up=False)) as c:
         [comic] = c.get("/api/comics").json()["comics"]
-        assert comic["pages"] == ["/api/comics/two-minutes/pages/1", "/api/comics/two-minutes/pages/2"]
+        assert [p.split("?")[0] for p in comic["pages"]] == ["/api/comics/two-minutes/pages/1",
+                                                              "/api/comics/two-minutes/pages/2"]
         # A nickname finds the character's page; someone not in the roster is still listed.
         assert comic["characters"] == [{"name": "Arnok", "id": "arnok"}, {"name": "Kael", "id": None}]
         assert c.get("/api/comics/two-minutes/pages/2").content == b"02.png"

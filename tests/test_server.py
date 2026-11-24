@@ -1,3 +1,4 @@
+import io
 import json
 
 import pytest
@@ -40,9 +41,27 @@ def test_party_name_and_emblem(archive):
     (archive.root / "assets" / "emblem.png").write_bytes(b"fake-png")
     with TestClient(create_app(engine, warm_up=False)) as c:
         page = c.get("/").text
-        assert '<img class="sigil" src="/emblem"' in page and '<link rel="icon" href="/emblem">' in page
+        assert '<img class="sigil" src="/emblem?v=' in page and '<link rel="icon" href="/emblem?v=' in page
         assert "<svg class=\"sigil\"" not in page
         assert c.get("/emblem").content == b"fake-png"
+        assert c.get("/emblem?w=96").content == b"fake-png"     # not an image Pillow can read: sent as is
+
+
+def test_images_shrink_and_stay_cached(archive):
+    from PIL import Image
+
+    (archive.root / "assets").mkdir()
+    Image.new("RGB", (1000, 1000), "teal").save(archive.root / "assets" / "emblem.png")
+    engine = RagEngine(archive, embedder=FakeEmbedder(), reranker=FakeReranker(), llm=FakeLLM())
+    with TestClient(create_app(engine, warm_up=False)) as c:
+        url = c.get("/api/status").json()["emblem"]
+        small = c.get(url + "&w=90")                        # snaps to the next size up, 96
+        assert small.headers["content-type"] == "image/webp" and "immutable" in small.headers["cache-control"]
+        assert Image.open(io.BytesIO(small.content)).size == (96, 96)
+        assert list((archive.root / "data" / ".cache" / "images").glob("*.webp"))
+        again = c.get(url + "&w=96", headers={"if-none-match": small.headers["etag"]})
+        assert again.status_code == 304 and not again.content
+        assert c.get("/emblem?w=96&v=old").headers["cache-control"] == "no-cache"   # an out-of-date link
 
 
 def test_chat_streams_events(client):
