@@ -9,12 +9,14 @@
 
 ahmed hossam  = Kael
 ahmedhoss61   = Kael
-seifeldien    = Vaylor
+seifeldien    = Vaelor
 geniusgamerm  = Dungeon Master
 noob          = Arnok
 arnok         = Arnok
 abdoo_        = Arnok  
 hazemonsif    = Thalion
+# Old name in transcripts made before the spelling was fixed (scribe import)
+vaylor        = Vaelor
 
 # Bots / non-speech tracks
 # Craig appends a numeric discriminator to Discord usernames

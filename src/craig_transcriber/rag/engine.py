@@ -24,6 +24,7 @@ from . import prompts
 from .config import RagConfig
 from .index import Index, IngestReport, ingest
 from .models import CrossEncoderReranker, Embedder, Reranker, TransformerEmbedder
+from .party import Party
 from .retriever import Hit, Retriever
 from .router import QueryRouter, Route
 
@@ -74,6 +75,7 @@ class RagEngine:
             config.path(config.router.examples), self.embedder,
             config.index_dir / "router.npz",
         )
+        self.party = Party(config)
         self._lock = threading.RLock()   # guards index swaps
         self._index: Index | None = None
         self.ingesting = False
@@ -111,7 +113,7 @@ class RagEngine:
             self.ingesting = False
 
     def retriever(self) -> Retriever:
-        return Retriever(self.config.retrieval, self.index, self.embedder, self.reranker)
+        return Retriever(self.config.retrieval, self.index, self.embedder, self.reranker, self._expand)
 
     def status(self) -> dict:
         index = self.index
@@ -120,6 +122,7 @@ class RagEngine:
             kinds[doc["kind"]] = kinds.get(doc["kind"], 0) + 1
         indexed_model = index.manifest.get("embedding_model")
         return {
+            "party": {"name": self.config.party.name, "tagline": self.config.party.tagline},
             "documents": len(index.docs),
             "passages": len(index.passages),
             "kinds": kinds,
@@ -155,6 +158,19 @@ class RagEngine:
         vec = self.embedder.encode([question], query=True)[0]
         return self.router.decide(question, vec)
 
+    def _expand(self, query: str) -> str:
+        try:
+            return self.party.expand_query(query)
+        except (OSError, ValueError):   # a broken roster must not break search
+            return query
+
+    def _system(self, system: str) -> str:
+        try:
+            roster = self.party.describe()
+        except (OSError, ValueError):
+            roster = ""
+        return prompts.for_party(system, self.config.party.name, roster)
+
     def search_query(self, question: str, history: list[dict]) -> str:
         """Fold the previous question in when this one only makes sense after it."""
         last_user = next((m.get("content", "") for m in reversed(history) if m.get("role") == "user"), "")
@@ -184,7 +200,7 @@ class RagEngine:
             route = self.router.decide(question, query_vec)
         yield {"type": "route", **route.as_dict(), "query": query}
 
-        retriever = Retriever(self.config.retrieval, index, self.embedder, self.reranker)
+        retriever = Retriever(self.config.retrieval, index, self.embedder, self.reranker, self._expand)
         t_search = time.time()
         if route.mode == "single":
             hits = retriever.search(query, self.config.retrieval.final_k, query_vec)
@@ -200,7 +216,7 @@ class RagEngine:
         t_answer = time.time()
         answer = []
         try:
-            for piece in self.llm.stream(prompts.ANSWER_SYSTEM, prompt,
+            for piece in self.llm.stream(self._system(prompts.ANSWER_SYSTEM), prompt,
                                          temperature=self.config.llm.temperature):
                 answer.append(piece)
                 yield {"type": "token", "text": piece}
@@ -218,7 +234,7 @@ class RagEngine:
     def _plan(self, question: str) -> tuple[list[str], str]:
         limit = self.config.multistep.max_subqueries
         try:
-            raw = self.llm.complete(prompts.PLAN_SYSTEM.format(max_q=limit), question,
+            raw = self.llm.complete(self._system(prompts.PLAN_SYSTEM.format(max_q=limit)), question,
                                     schema=prompts.PLAN_SCHEMA, temperature=0.0)
             queries = [q.strip() for q in json.loads(raw).get("queries", []) if q.strip()]
             if queries:
@@ -231,7 +247,7 @@ class RagEngine:
         limit = self.config.multistep.max_subqueries
         sample = [h.as_source(0) for h in hits[:12]]
         try:
-            raw = self.llm.complete(prompts.FOLLOWUP_SYSTEM.format(max_q=limit),
+            raw = self.llm.complete(self._system(prompts.FOLLOWUP_SYSTEM.format(max_q=limit)),
                                     prompts.followup_prompt(question, tried, sample),
                                     schema=prompts.FOLLOWUP_SCHEMA, temperature=0.0)
             data = json.loads(raw)

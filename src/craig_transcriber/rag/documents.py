@@ -75,7 +75,28 @@ def read_sections(src: SourceFile) -> list[Section]:
         "md": read_markdown, "txt": read_text, "pdf": read_pdf, "docx": read_docx,
         "html": read_html, "transcript": read_transcript,
     }[src.kind]
-    return [s for s in reader(src.path) if s.text.strip()]
+    sections = reader(src.path)
+    if src.kind != "transcript":
+        for s in sections:
+            s.text = clean_text(s.text)
+    return [s for s in sections if s.text.strip()]
+
+
+# Bumped whenever reading or cleaning changes what text a file gives, so
+# `scribe rag ingest` re-reads everything once instead of keeping stale text.
+READER_VERSION = 2
+
+# Word and PDF exports write list bullets in symbol fonts, which come out as
+# private-use characters ("" U+F0B7, "" U+F0A7, ...) that show as boxes, or
+# as control characters (U+007F in Google Docs / Word exports).
+_JUNK = "-\x00-\x08\x0b\x0c\x0e-\x1f\x7f"
+_BULLET_LINE = re.compile(rf"^[ \t]*(?:[{_JUNK}]|[•▪◦●‣⁃∙·](?=[ \t]))[ \t]*", re.M)
+
+
+def clean_text(text: str) -> str:
+    """Normal "- " bullets in place of symbol-font ones; other stray glyphs dropped."""
+    text = _BULLET_LINE.sub("- ", text)
+    return re.sub(f"[{_JUNK}]", "", text)
 
 
 def read_text(path: Path) -> list[Section]:
@@ -117,8 +138,56 @@ def read_pdf(path: Path) -> list[Section]:
     except ImportError as exc:
         raise RuntimeError("reading PDFs needs pypdf: uv pip install pypdf") from exc
     reader = PdfReader(str(path))
-    return [Section(page.extract_text() or "", location=f"p. {i}")
-            for i, page in enumerate(reader.pages, start=1)]
+    sections = []
+    for i, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        fields = _pdf_form_fields(page)
+        if fields:
+            text = f"{text}\n\n{fields}" if text.strip() else fields
+        sections.append(Section(text, location=f"p. {i}"))
+    return sections
+
+
+def _pdf_inherited(obj, key: str):
+    """A field attribute, looked up through the widget's parents."""
+    for _ in range(8):
+        if obj is None:
+            return None
+        if key in obj:
+            return obj[key]
+        parent = obj.get("/Parent")
+        obj = parent.get_object() if parent is not None else None
+    return None
+
+
+def _pdf_form_fields(page) -> str:
+    """
+    What was typed into a fillable PDF's form fields on this page. Character
+    sheets (the official 5e sheet, D&D Beyond exports) keep everything the
+    player wrote there, where extract_text() can't see it.
+    """
+    lines: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for annot in page.get("/Annots") or []:
+        widget = annot.get_object()
+        if widget.get("/Subtype") != "/Widget":
+            continue
+        name, value = _pdf_inherited(widget, "/T"), _pdf_inherited(widget, "/V")
+        if name is None or value is None:
+            continue
+        value = str(value).strip()
+        if value.startswith("/"):                  # checkbox / radio: /Off, /Yes, /On, ...
+            if value == "/Off":
+                continue
+            value = "yes"
+        if not value:
+            continue
+        label = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", str(name)).replace("_", " ").strip()
+        if (label, value) in seen:
+            continue
+        seen.add((label, value))
+        lines.append(f"{label}:\n{value}" if "\n" in value or "\r" in value else f"{label}: {value}")
+    return "\n".join(lines).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def read_docx(path: Path) -> list[Section]:

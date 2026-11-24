@@ -4,6 +4,7 @@
     scribe craig     transcribe a Craig Bot recording (one track per player)
     scribe phone     transcribe one mixed recording (phone, Zoom), or --enroll voices
     scribe correct   fix misheard lines with Gemini, listening to the audio
+    scribe import    add an old transcript.txt as a session
     scribe rag       build the document index and ask questions from the terminal
     scribe serve     start the chat UI at http://127.0.0.1:8000
 
@@ -19,6 +20,7 @@ COMMANDS = {
     "craig": "craig_transcriber.cli.craig",
     "phone": "craig_transcriber.cli.phone",
     "correct": "craig_transcriber.cli.correct",
+    "import": "craig_transcriber.cli.importer",
     "rag": "craig_transcriber.cli.rag",
     "serve": "craig_transcriber.cli.serve",
 }

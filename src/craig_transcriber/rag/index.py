@@ -23,7 +23,7 @@ import numpy as np
 
 from .chunking import Passage, chunk_document
 from .config import RagConfig
-from .documents import SourceFile, read_sections, scan_sources
+from .documents import READER_VERSION, SourceFile, read_sections, scan_sources
 from .keyword import BM25
 from .models import Embedder
 
@@ -138,7 +138,7 @@ class Index:
 def settings_signature(config: RagConfig) -> dict:
     """Whatever, if changed, makes existing vectors unusable."""
     return {"embedding": asdict(config.embedding) | {"batch_size": None, "device": None},
-            "chunking": asdict(config.chunking)}
+            "chunking": asdict(config.chunking), "reader": READER_VERSION}
 
 
 def ingest(config: RagConfig, embedder: Embedder, *, rebuild: bool = False,
@@ -148,7 +148,7 @@ def ingest(config: RagConfig, embedder: Embedder, *, rebuild: bool = False,
     old = Index.load(config.index_dir) if not rebuild else Index(config.index_dir)
     signature = settings_signature(config)
     if old.manifest.get("settings") not in (None, signature) or old.manifest.get("version") != INDEX_VERSION:
-        progress("Embedding or chunking settings changed: rebuilding the whole index.")
+        progress("Embedding, chunking or file reading changed: rebuilding the whole index.")
         old = Index(config.index_dir)
         report.rebuilt = True
     report.rebuilt |= rebuild

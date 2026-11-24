@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lorekeeper</title>
+<title>{{party}} Lore</title>
+<!--icon-->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Naskh+Arabic:wght@400;600&display=swap">
@@ -18,19 +19,32 @@
 
   <aside class="rail" id="rail" aria-label="Conversations and library">
     <div class="brand">
-      <span class="brand-name">Lorekeeper</span>
-      <span class="brand-sub">campaign archive</span>
+      <!--sigil--><!-- An eye inside a ward-stone: "vakt" is the watch, the one who keeps guard. -->
+      <svg class="sigil" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 2.5 27.5 16 16 29.5 4.5 16Z"/>
+        <path d="M8.5 16q7.5-7.5 15 0-7.5 7.5-15 0Z"/>
+        <circle cx="16" cy="16" r="2.3" class="fill"/>
+      </svg><!--/sigil-->
+      <span class="brand-text">
+        <span class="brand-name">{{party}}</span>
+        <span class="brand-sub">{{tagline}}</span>
+      </span>
     </div>
 
     <button class="btn btn-primary new-chat" id="new-chat" type="button">New question</button>
 
     <div class="tabs" role="tablist">
-      <button role="tab" id="tab-chats" aria-selected="true" aria-controls="panel-chats" type="button">Conversations</button>
+      <button role="tab" id="tab-chats" aria-selected="true" aria-controls="panel-chats" type="button">Questions</button>
+      <button role="tab" id="tab-party" aria-selected="false" aria-controls="panel-party" type="button">Party</button>
       <button role="tab" id="tab-library" aria-selected="false" aria-controls="panel-library" type="button">Library</button>
     </div>
 
     <section class="panel" id="panel-chats" role="tabpanel" aria-labelledby="tab-chats">
       <ol class="chat-list" id="chat-list"></ol>
+    </section>
+
+    <section class="panel" id="panel-party" role="tabpanel" aria-labelledby="tab-party" hidden>
+      <nav aria-label="Characters"><ul class="party-list" id="party-list"></ul></nav>
     </section>
 
     <section class="panel" id="panel-library" role="tabpanel" aria-labelledby="tab-library" hidden>
@@ -68,11 +82,12 @@
     </header>
 
     <div class="thread" id="thread" aria-live="polite"></div>
+    <div class="profile" id="profile" hidden></div>
 
     <form class="composer" id="composer" autocomplete="off">
       <label class="visually-hidden" for="question">Your question</label>
       <textarea id="question" rows="1" dir="auto"
-        placeholder="Ask about the rules, your notes or what happened in a session…"></textarea>
+        placeholder="Ask about the lore, the rules or what happened in a session…"></textarea>
       <div class="composer-row">
         <fieldset class="segmented" id="mode" aria-label="Search mode">
           <label title="The router decides"><input type="radio" name="mode" value="auto" checked><span>Auto</span></label>
@@ -87,13 +102,14 @@
 
   <aside class="catalog" id="catalog" aria-label="Sources">
     <header class="catalog-head">
-      <h2>Sources</h2>
+      <h2 id="catalog-title">Sources</h2>
       <button class="icon-btn only-medium" id="close-catalog" type="button" aria-label="Hide sources">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </header>
     <div class="trace" id="trace"></div>
     <ol class="cards" id="cards"></ol>
+    <div class="appearances" id="appearances" hidden></div>
   </aside>
 
   <div class="scrim" id="scrim" hidden></div>

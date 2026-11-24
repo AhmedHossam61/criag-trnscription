@@ -16,7 +16,7 @@
 {"question": "What did the DM say about the altar?", "label": "single"}
 {"question": "What happened at the start of session 19?", "label": "single"}
 {"question": "Which deity does Thalion worship?", "label": "single"}
-{"question": "What is Vaylor's class?", "label": "single"}
+{"question": "What is Vaelor's class?", "label": "single"}
 {"question": "What is the DC for a religion check on the altar?", "label": "single"}
 {"question": "How does grappling work?", "label": "single"}
 {"question": "What does the Shield spell do?", "label": "single"}
@@ -63,7 +63,7 @@
 {"question": "Can Thalion cast Detect Magic as a ritual, and how many spell slots would that save him?", "label": "multi"}
 {"question": "What happened to the merchant, and who benefited from it?", "label": "multi"}
 {"question": "How do the rules for concentration interact with taking damage while casting a ritual?", "label": "multi"}
-{"question": "Compare Vaylor's and Kael's abilities in combat.", "label": "multi"}
+{"question": "Compare Vaelor's and Kael's abilities in combat.", "label": "multi"}
 {"question": "What clues point to who leads the cult?", "label": "multi"}
 {"question": "Track the celestial shards: where was each one found and who has it now?", "label": "multi"}
 {"question": "What promises did we make to NPCs that we haven't kept yet?", "label": "multi"}
@@ -79,7 +79,7 @@
 {"question": "What led to the fight at the end of session 19?", "label": "multi"}
 {"question": "Explain the Ritual Adept feature and list which of my spells it works with.", "label": "multi"}
 {"question": "What are all the times someone made a religion check, and what did they find?", "label": "multi"}
-{"question": "How is Vaylor connected to the guardians, and does Thalion know?", "label": "multi"}
+{"question": "How is Vaelor connected to the guardians, and does Thalion know?", "label": "multi"}
 {"question": "Which rules apply when a creature is both prone and restrained?", "label": "multi"}
 {"question": "What do the transcripts say about the shard compared to the campaign notes?", "label": "multi"}
 {"question": "قارن بين الـ cult والـ guardians", "label": "multi"}

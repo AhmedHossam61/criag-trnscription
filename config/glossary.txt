@@ -8,10 +8,16 @@
 
 ## Players and their characters
 Kael (player ahmedhoss61)
-Vaylor (player seifeldien) -- sometimes transcribed "velor"
+Vaelor (player seifeldien) -- written فيلور in Arabic; sometimes transcribed "velor" or "Vaylor"
 Thalion (player hazemonsif)
-Arnok (player abdoo_) -- written أرنوك in Arabic; often misheard as ارضك / الارض / قرنق / ارنق
+Arnok (player abdoo_) -- written أرنوك in Arabic; often misheard as ارضك / الارض / قرنق / ارنق.
+  The others call Arnok's player "Noob" (نوب, e.g. "يا نوب") -- a nickname, keep it as نوب.
+Vaelor's player (seifeldien) is nicknamed "Modmen" (مدمن, e.g. "يا مدمن") -- a nickname, keep it as مدمن.
 Dungeon Master / DM (geniusgamerm) -- narrates and voices NPCs; sometimes speaks in a Sa'idi accent for a character
+
+## Companions
+Hasaneen (حسنين)
+Ronaldo Raddis the Third -- said "Ronald Radish the Third", written رونالد / راديش / رادش; nicknamed "مخلل" (pickle), keep it as مخلل
 
 ## Campaign names (NPCs, places, factions, items)
 The Nameless Beyond -- misheard as "The Nihilist Beyond" / "The Nemesis Beyond"

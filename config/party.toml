@@ -1,0 +1,74 @@
+# VAKT's roster. The lore site makes a page for every character listed here:
+# the four of you under "Party", the companions on their own page.
+#
+#   name       what everyone calls them; their page address is made from it (#kael)
+#   role       "main" (a player's character) or "companion"
+#   full_name  optional, e.g. "Kael Veyron"
+#   player     who plays them (main characters); the Discord name is fine
+#   title      one line under the name, e.g. "Bladesinger of House Veyron"
+#   summary    a few sentences for the top of their page
+#   sheet      their PDF (or .md / .docx), shown on their page. Leave it out and a
+#              file in data/documents/characters named after them is used
+#              (Hasaneen.pdf, Raddis.pdf, "Ronaldo Raddis the Third.pdf", ...)
+#   portrait   an image; leave it out and assets/<name>/portrait.png (.jpg /
+#              .webp) is used, or else the first image in that folder
+#   aliases    other spellings, above all how the transcripts write the name in
+#              Arabic. Their page lists where any of these come up in the
+#              sessions, and questions using one name also search for the others.
+#
+# Edit freely; the site picks up changes on the next page load.
+
+[[character]]
+name = "Kael"
+full_name = "Kael Veyron"
+role = "main"
+player = "ahmedhoss61"
+title = "Bladesinger of House Veyron"
+sheet = "data/documents/characters/Kael.pdf"
+aliases = ["كايل"]
+
+[[character]]
+name = "Vaelor"
+role = "main"
+player = "seifeldien"
+title = ""
+sheet = ""
+# "Modmen" (مدمن) is the player's nickname at the table.
+# Older transcripts label his lines "Vaylor".
+aliases = ["فيلور", "Vaylor", "Velor", "Modmen", "مدمن"]
+
+[[character]]
+name = "Thalion"
+role = "main"
+player = "hazemonsif"
+title = ""
+sheet = ""
+aliases = ["ثاليون"]
+
+[[character]]
+name = "Arnok"
+role = "main"
+player = "abdoo_"
+title = ""
+sheet = ""
+# "Noob" (نوب) is the player's nickname at the table.
+aliases = ["أرنوك", "Noob", "نوب"]
+
+# ---- companions ------------------------------------------------------------
+
+[[character]]
+name = "Hasaneen"
+role = "companion"
+title = "Kobold cook and traveling companion"
+summary = """A small, bespectacled kobold the party met while investigating the merchant Haridy. \
+Arnok meant to kill him but spared him, and he became the party's cook: gathering herbs, making \
+food and drinks, and carrying the supplies. Innocent, eager to help, quick to hide, and very fond of gold."""
+aliases = ["حسنين", "حسانين", "Hassaneen"]
+
+[[character]]
+name = "Ronaldo Raddis the Third"
+role = "companion"
+title = ""
+summary = ""
+# "مخلل" (pickle) is the party's nickname for him.
+aliases = ["Ronaldo", "Raddis", "Ronald Radish", "Radish", "رونالدو", "رونالد", "راديش", "رادش", "مخلل"]

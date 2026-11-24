@@ -50,6 +50,16 @@ FOLLOWUP_SCHEMA = {
 }
 
 
+def for_party(system: str, party: str, roster: str = "") -> str:
+    """A system prompt that knows the players' party by name, and who is in it."""
+    if party:
+        system += (f"\n\nThe players' party is called {party}. Questions about {party} "
+                   "are about the party, its members and what they have done.")
+    if roster:
+        system += "\n\nWho is who (names in the transcripts may be spelled in Arabic):\n" + roster
+    return system
+
+
 def format_sources(sources: list[dict], max_chars: int = 2400) -> str:
     blocks = []
     for s in sources:

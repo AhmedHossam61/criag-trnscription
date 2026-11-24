@@ -22,10 +22,27 @@ def sse(response) -> list[dict]:
 
 
 def test_ui_and_status(client):
-    assert "Lorekeeper" in client.get("/").text
+    assert "{{party}}" not in client.get("/").text
     assert client.get("/static/app.js").status_code == 200
     status = client.get("/api/status").json()
     assert status["documents"] == 3 and status["passages"] > 0 and status["llm"] == "fake-llm"
+
+
+def test_party_name_and_emblem(archive):
+    archive.party.name = "VAKT"
+    engine = RagEngine(archive, embedder=FakeEmbedder(), reranker=FakeReranker(), llm=FakeLLM())
+    with TestClient(create_app(engine, warm_up=False)) as c:
+        page = c.get("/").text
+        assert "<title>VAKT Lore</title>" in page and "<svg class=\"sigil\"" in page
+        assert c.get("/emblem").status_code == 404
+
+    (archive.root / "assets").mkdir()
+    (archive.root / "assets" / "emblem.png").write_bytes(b"fake-png")
+    with TestClient(create_app(engine, warm_up=False)) as c:
+        page = c.get("/").text
+        assert '<img class="sigil" src="/emblem"' in page and '<link rel="icon" href="/emblem">' in page
+        assert "<svg class=\"sigil\"" not in page
+        assert c.get("/emblem").content == b"fake-png"
 
 
 def test_chat_streams_events(client):

@@ -1,6 +1,6 @@
 "use strict";
 
-/* Lorekeeper: chat over the campaign archive.
+/* The party's lore: chat over the campaign's documents and session transcripts.
    Conversations live in this browser (localStorage); documents and the index
    live on the server. The server streams each answer as server-sent events:
    route -> plan (one per search round) -> sources -> token... -> done | error. */
@@ -23,12 +23,13 @@ const el = (tag, attrs = {}, ...children) => {
   return node;
 };
 
-const EXAMPLES = [
+const examples = (party) => [
   { q: "What does the Ritual Adept feature let me do?", tag: "Rules" },
-  { q: "Compare what the cult and the guardians want from the celestial shards.", tag: "Multi-step" },
+  { q: `Who is in ${party}, and what has each of them done so far?`, tag: "Multi-step" },
   { q: "What happened at the altar in session 19?", tag: "Transcripts" },
   { q: "الـ DM قال ايه عن The Nameless Beyond؟", tag: "Arabic" },
 ];
+const partyName = () => (state.status && state.status.party && state.status.party.name) || "the party";
 
 /* ---------------------------------------------------------------- storage */
 
@@ -49,6 +50,9 @@ const state = {
   selected: null,     // index of the assistant message shown in the catalog
   controller: null,   // AbortController of the running answer
   status: null,
+  view: { kind: "chat" },   // chat | character (id) | companions; follows location.hash
+  party: null,              // /api/party
+  partyError: null,
 };
 
 function loadState() {
@@ -225,7 +229,7 @@ function renderTurn(conv, i) {
   if (msg.stopped) foot.append(el("span", { text: "Stopped" }));
 
   return el("section", { class: "turn", id: `m-${i}` },
-    el("div", { class: "who" }, "Archive", routeChips(msg)),
+    el("div", { class: "who" }, "Lore", routeChips(msg)),
     body,
     msg.error ? el("div", { class: "error-box", role: "alert", text: msg.error }) : null,
     foot.childNodes.length ? foot : null);
@@ -234,17 +238,26 @@ function renderTurn(conv, i) {
 function renderWelcome() {
   const empty = state.status && state.status.passages === 0;
   const box = el("div", { class: "welcome" },
-    el("h2", { text: empty ? "The archive is empty" : "Ask the archive" }),
+    state.status && state.status.emblem ? el("img", { class: "crest", src: "/emblem", alt: `${partyName()} crest` }) : null,
+    el("h2", { text: empty ? `${partyName()}'s lore is empty` : `Ask about ${partyName()}'s lore` }),
     el("p", { text: empty
-      ? "Add your rulebooks, campaign notes or character sheets in the Library. Session transcripts in data/transcripts are added when you re-index."
+      ? "Add your lore, campaign notes, character sheets or rulebooks in the Library. Session transcripts in data/transcripts are added when you re-index."
       : "Answers come from your documents and session transcripts, with the passages they cite. The router picks one search for simple questions and several for questions with parts." }));
   if (empty) {
     box.append(el("div", {}, el("button", { class: "btn btn-primary", type: "button", onclick: () => { showTab("library"); openRail(); } }, "Open the Library")));
   } else {
-    box.append(el("div", { class: "examples" }, EXAMPLES.map((ex) =>
+    box.append(el("div", { class: "examples" }, examples(partyName()).map((ex) =>
       el("button", { class: "example", type: "button", onclick: () => ask(ex.q) },
         el("span", { class: "tag", text: ex.tag }),
         el("span", { class: "q", dir: "auto", text: ex.q })))));
+  }
+  if (mains().length || companions().length) {
+    box.append(el("div", { class: "meet" },
+      el("span", { class: "meet-label", text: "The party" }),
+      el("div", { class: "meet-row" },
+        mains().map((c) => el("a", { href: `#${c.id}` }, avatar(c, "sm"), c.name)),
+        companions().length ? el("a", { href: "#companions", class: "comp" },
+          el("span", { class: "avatar-stack" }, companions().slice(0, 3).map((c) => avatar(c, "xs"))), "Companions") : null)));
   }
   return box;
 }
@@ -324,7 +337,7 @@ function renderCatalog() {
       el("ul", {}, p.queries.map((q) => el("li", { dir: "auto", text: q })))));
   });
   if (!msg.sources.length) {
-    cards.append(el("li", { class: "cards-empty", text: msg.pending ? "Searching…" : "Nothing matched in the archive." }));
+    cards.append(el("li", { class: "cards-empty", text: msg.pending ? "Searching…" : "Nothing in the lore matched." }));
     return;
   }
   msg.sources.forEach((s) => cards.append(renderCard(s)));
@@ -344,12 +357,12 @@ function openRail() { if (matchMedia("(max-width: 760px)").matches) { app.classL
 function openCatalog() { if (matchMedia("(max-width: 1180px)").matches) { app.classList.add("catalog-open"); $("#scrim").hidden = false; } }
 
 function showTab(name) {
-  const chats = name === "chats";
-  $("#tab-chats").setAttribute("aria-selected", chats);
-  $("#tab-library").setAttribute("aria-selected", !chats);
-  $("#panel-chats").hidden = !chats;
-  $("#panel-library").hidden = chats;
-  if (!chats) loadDocuments();
+  for (const tab of ["chats", "party", "library"]) {
+    $(`#tab-${tab}`).setAttribute("aria-selected", tab === name);
+    $(`#panel-${tab}`).hidden = tab !== name;
+  }
+  if (name === "library") loadDocuments();
+  if (name === "party") loadParty();
 }
 
 function selectMessage(i, reveal = false) {
@@ -375,7 +388,7 @@ function openConversation(id) {
   const conv = current();
   const last = conv ? conv.messages.map((m) => m.role).lastIndexOf("assistant") : -1;
   state.selected = last >= 0 ? last : null;
-  saveState(); renderAll(); closePanels();
+  saveState(); navigate(""); closePanels();
   $("#thread").scrollTop = $("#thread").scrollHeight;
 }
 
@@ -541,6 +554,253 @@ async function upload(fileList) {
   }
 }
 
+/* ------------------------------------------------------------------ party */
+
+const SHEET_PREVIEW = 4;      // sheet pages shown before "Show all"
+const MENTION_PREVIEW = 6;    // mentions per session shown before "Show all"
+const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+const mains = () => (state.party ? state.party.characters.filter((c) => c.role === "main") : []);
+const companions = () => (state.party ? state.party.characters.filter((c) => c.role === "companion") : []);
+
+function avatar(c, size = "") {
+  return c.portrait
+    ? el("img", { class: `avatar ${size}`, src: c.portrait, alt: "", loading: "lazy" })
+    : el("span", { class: `avatar mono ${size}`, "aria-hidden": "true", text: (c.name.trim()[0] || "?").toUpperCase() });
+}
+
+async function loadParty() {
+  try {
+    state.party = await api("/api/party");
+    state.partyError = null;
+  } catch (e) {
+    state.party = { characters: [] };
+    state.partyError = e.message;
+  }
+  renderPartyList();
+  return state.party;
+}
+
+function renderPartyList() {
+  const view = state.view;
+  const row = (c, extra = "") => el("li", {},
+    el("a", { class: `party-row ${extra}` + (view.kind === "character" && view.id === c.id ? " active" : ""), href: `#${c.id}` },
+      avatar(c, extra ? "xs" : "sm"),
+      el("span", { class: "who-text" },
+        el("span", { class: "n", text: c.name }),
+        extra ? null : el("span", { class: "s", text: c.title || (c.player ? `played by ${c.player}` : "") }))));
+  const items = [];
+  if (state.partyError) items.push(el("li", { class: "chat-empty error", text: `config/party.toml: ${state.partyError}` }));
+  items.push(...mains().map((c) => row(c)));
+  items.push(el("li", { class: "party-sep" },
+    el("a", { class: "party-row" + (view.kind === "companions" ? " active" : ""), href: "#companions" },
+      el("span", { class: "who-text" }, el("span", { class: "n", text: "Companions" }),
+        el("span", { class: "s", text: companions().length ? plural(companions().length, "companion") : "none yet" })))));
+  items.push(...companions().map((c) => row(c, "sub")));
+  $("#party-list").replaceChildren(...items);
+}
+
+// Sheets come from PDFs as printed lines; join them back into paragraphs,
+// lists and headings so they read like the document rather than a dump.
+function reflow(text) {
+  const lines = text.split("\n").map((l) => l.trim());
+  const widths = lines.filter(Boolean).map((l) => l.length).sort((a, b) => a - b);
+  const full = widths.length ? widths[Math.floor(widths.length * 0.8)] : 80;
+  const blocks = [];
+  let open = null;
+  const close = () => { if (open) blocks.push(open); open = null; };
+  for (const line of lines) {
+    if (!line) { close(); continue; }
+    const bullet = line.match(/^[-•]\s+(.*)$/);
+    const short = line.length < full * 0.72;
+    const ends = /[.!?:;…"”’)\]]$/.test(line);
+    if (bullet) { close(); open = { type: "li", text: bullet[1] }; }
+    else if (open) {
+      open.text = /[a-z]-$/.test(open.text) ? open.text.slice(0, -1) + line : `${open.text} ${line}`;
+    } else if (short && !ends && line.length < 64 && /^[\p{Lu}\p{N}"“]/u.test(line)) {
+      blocks.push({ type: "h", text: line }); continue;
+    } else open = { type: "p", text: line };
+    if (short) close();
+  }
+  close();
+  return blocks;
+}
+
+function renderBlocks(blocks) {
+  const out = [];
+  let list = null;
+  for (const b of blocks) {
+    if (b.type === "li") { if (!list) out.push(list = el("ul")); list.append(el("li", { dir: "auto", text: b.text })); continue; }
+    list = null;
+    out.push(b.type === "h" ? el("h4", { dir: "auto", text: b.text }) : el("p", { dir: "auto", text: b.text }));
+  }
+  return out;
+}
+
+function askFresh(question) {
+  if (state.controller) return;
+  newConversation();
+  navigate("");
+  showTab("chats");
+  ask(question);
+}
+
+function characterQuestions(c) {
+  const n = c.name;
+  return c.role === "companion"
+    ? [`Who is ${n}, and how did they come to travel with ${partyName()}?`, `What has ${n} done in the sessions?`,
+       `What do the others say about ${n}?`]
+    : [`Who is ${n}?`, `What has ${n} done in the sessions so far?`, `What do the others say about ${n}?`];
+}
+
+function renderSheet(c) {
+  const section = el("section", { class: "sheet" });
+  const label = el("h3", { class: "section-label" }, "Sheet");
+  section.append(label);
+  if (!c.sheet) {
+    section.append(el("p", { class: "muted note", text: c.role === "main"
+      ? `No sheet yet. Put ${c.name}'s PDF in data/documents/characters, then set sheet = "data/documents/characters/${c.name}.pdf" for them in config/party.toml.`
+      : `No sheet yet. Notes about ${c.name} can go in data/documents/lore; set sheet in config/party.toml to show one here.` }));
+    return section;
+  }
+  if (c.sheet.error) { section.append(el("div", { class: "error-box", text: `${c.sheet.path}: ${c.sheet.error}` })); return section; }
+  const pages = c.sheet.sections;
+  label.append(el("span", { class: "label-meta", text: `${c.sheet.path.split("/").pop()} · ${plural(pages.length, "section")}` }));
+  const nodes = pages.map((p) => el("article", { class: "sheet-page" },
+    el("div", { class: "page-no", text: p.location || "" }),
+    el("div", { class: "sheet-text" }, p.heading ? el("h4", { dir: "auto", text: p.heading }) : null, renderBlocks(reflow(p.text)))));
+  const body = el("div", { class: "sheet-body" }, nodes.slice(0, SHEET_PREVIEW));
+  section.append(body);
+  if (nodes.length > SHEET_PREVIEW) {
+    const more = el("button", { class: "btn sheet-more", type: "button", text: `Show all ${pages.length}`,
+      onclick: () => { body.append(...nodes.slice(SHEET_PREVIEW)); more.remove(); } });
+    section.append(more);
+  }
+  return section;
+}
+
+function renderAppearances(c) {
+  const box = $("#appearances");
+  if (!c) { box.replaceChildren(); return; }
+  const parts = [];
+  if (!c.appearances.length) {
+    parts.push(el("p", { class: "cards-empty", text: `${c.name} doesn't come up in the transcripts yet. If the transcripts spell the name another way, add that spelling to aliases in config/party.toml.` }));
+  }
+  for (const s of c.appearances) {
+    const stats = [];
+    if (s.spoken_lines) stats.push(`${plural(s.spoken_lines, "line")} spoken · ${s.spoken_minutes} min`);
+    stats.push(s.mention_count ? `named ${plural(s.mention_count, "time")} by others` : "not named by others");
+    const items = s.mentions.map((m) => el("li", { class: "mention" },
+      el("span", { class: "clock", text: m.clock }),
+      el("div", {}, el("span", { class: "speaker", text: m.speaker }), el("span", { class: "line", dir: "auto", text: m.text }))));
+    const list = el("ol", { class: "mentions" }, items.slice(0, MENTION_PREVIEW));
+    const group = el("section", { class: "app-group" },
+      el("h3", { text: s.title }), el("div", { class: "app-stats", text: stats.join(" · ") }), items.length ? list : null);
+    if (items.length > MENTION_PREVIEW) {
+      const more = el("button", { class: "link-btn", type: "button",
+        text: s.mention_count > items.length ? `Show the first ${items.length} of ${s.mention_count}` : `Show all ${items.length}`,
+        onclick: () => { list.replaceChildren(...items); more.remove(); } });
+      group.append(more);
+    }
+    parts.push(group);
+  }
+  if (c.documents.length) {
+    parts.push(el("section", { class: "app-group" }, el("h3", { text: "In your documents" }),
+      el("ol", { class: "mentions" }, c.documents.map((d) => el("li", { class: "doc-mention" },
+        el("div", { class: "speaker" }, d.title, el("span", { class: "muted", text: ` · ${plural(d.count, "passage")}` })),
+        d.snippets.map((sn) => el("div", { class: "line", dir: "auto" },
+          sn.where ? el("span", { class: "clock", text: `${sn.where} ` }) : null, sn.text)))))));
+  }
+  box.replaceChildren(...parts);
+}
+
+async function renderProfile(id) {
+  const box = $("#profile");
+  box.replaceChildren(el("div", { class: "profile-inner" }, el("p", { class: "muted", text: "Opening the page…" })));
+  renderAppearances(null);
+  let c;
+  try { c = await api(`/api/party/${encodeURIComponent(id)}`); }
+  catch (e) {
+    box.replaceChildren(el("div", { class: "profile-inner" }, el("div", { class: "error-box", role: "alert", text: e.message })));
+    return;
+  }
+  if (state.view.kind !== "character" || state.view.id !== id) return;   // navigated away meanwhile
+  $("#chat-title").textContent = c.name;
+  document.title = `${c.name} · ${partyName()} Lore`;
+
+  const facts = [c.role === "companion" ? `Companion of ${partyName()}` : c.player ? `Played by ${c.player}` : "Player character"];
+  if (c.sessions) facts.push(`In ${plural(c.sessions, "session")}`);
+  if (c.spoken_lines) facts.push(`${plural(c.spoken_lines, "line")} spoken`);
+  if (c.mentions) facts.push(`Named ${plural(c.mentions, "time")} by others`);
+
+  box.replaceChildren(el("div", { class: "profile-inner" },
+    el("header", { class: "hero" + (c.portrait ? " has-portrait" : "") },
+      avatar(c, "xl"),
+      el("div", { class: "hero-text" },
+        el("div", { class: "eyebrow", text: c.role === "companion" ? "Companion" : partyName() }),
+        el("h2", { text: c.name }),
+        c.full_name && c.full_name !== c.name ? el("div", { class: "full", text: c.full_name }) : null,
+        c.title ? el("div", { class: "title-line", text: c.title }) : null,
+        el("div", { class: "facts" }, facts.map((f) => el("span", { class: "chip", text: f }))),
+        c.aliases.length ? el("div", { class: "aliases", dir: "auto", text: `Also written ${c.aliases.join(" · ")}` }) : null)),
+    c.summary ? el("p", { class: "summary", dir: "auto", text: c.summary }) : null,
+    el("div", { class: "ask-row" }, el("span", { class: "meet-label", text: "Ask" }),
+      characterQuestions(c).map((q) => el("button", { class: "ask-chip", type: "button", onclick: () => askFresh(q) }, q))),
+    renderSheet(c)));
+  renderAppearances(c);
+}
+
+function renderCompanions() {
+  $("#chat-title").textContent = "Companions";
+  document.title = `Companions · ${partyName()} Lore`;
+  const comps = companions();
+  const grid = el("div", { class: "companion-grid" }, comps.map((c) => el("a", { class: "companion-card", href: `#${c.id}` },
+    avatar(c, "lg"),
+    el("div", { class: "cc-body" },
+      el("h3", { text: c.name }),
+      c.title ? el("div", { class: "cc-title", text: c.title }) : null,
+      c.summary ? el("p", { dir: "auto", text: c.summary }) : null,
+      el("div", { class: "cc-meta", text: c.mentions
+        ? `Named ${plural(c.mentions, "time")} in ${plural(c.sessions, "session")}` : "Not in the transcripts yet" })))));
+  $("#profile").replaceChildren(el("div", { class: "profile-inner" },
+    el("header", { class: "page-head" },
+      el("div", { class: "eyebrow", text: partyName() }),
+      el("h2", { text: "Companions" }),
+      el("p", { class: "muted", text: "Those who travel with the party. Each has a page with their notes and every time the sessions mention them." })),
+    comps.length ? grid : el("p", { class: "muted note", text: 'No companions yet. Add them to config/party.toml with role = "companion".' })));
+  $("#appearances").replaceChildren(el("p", { class: "cards-empty", text: "Open a companion to see where they come up in the sessions." }));
+}
+
+/* ---------------------------------------------------------------- routing */
+
+// The address bar holds the page: "" is the chat, #companions, or #<character>.
+function applyView() {
+  const chat = state.view.kind === "chat";
+  $("#thread").hidden = !chat; $("#composer").hidden = !chat; $("#profile").hidden = chat;
+  $("#trace").hidden = !chat; $("#cards").hidden = !chat; $("#appearances").hidden = chat;
+  $("#catalog-title").textContent = chat ? "Sources" : "In the sessions";
+  $("#open-catalog").setAttribute("aria-label", chat ? "Show sources" : "Show where they come up");
+  if (chat) document.title = `${partyName() === "the party" ? "" : partyName() + " "}Lore`.trim();
+}
+
+async function route() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  state.view = !hash ? { kind: "chat" } : hash === "companions" ? { kind: "companions" } : { kind: "character", id: hash };
+  applyView();
+  closePanels();
+  if (state.view.kind === "chat") { renderAll(); renderPartyList(); return; }
+  showTab("party");
+  $("#profile").scrollTop = 0;
+  await loadParty();
+  if (state.view.kind === "companions") renderCompanions();
+  else if (state.view.kind === "character") await renderProfile(state.view.id);
+}
+
+function navigate(hash) {
+  if (hash) { if (location.hash === `#${hash}`) route(); else location.hash = hash; return; }
+  if (location.hash) history.pushState(null, "", location.pathname + location.search);
+  route();
+}
+
 /* ----------------------------------------------------------------- status */
 
 let statusTimer = null;
@@ -555,7 +815,7 @@ async function refreshStatus() {
     if (s.warmup_error) { dot.className = "dot bad"; main.textContent = "Models failed to load"; }
     else if (s.ingesting) { dot.className = "dot busy"; main.textContent = "Indexing…"; busy = true; }
     else if (!s.models_loaded) { dot.className = "dot busy"; main.textContent = "Loading models…"; busy = true; }
-    else if (!s.passages) { dot.className = "dot"; main.textContent = "Archive is empty"; }
+    else if (!s.passages) { dot.className = "dot"; main.textContent = "No lore indexed yet"; }
     else { dot.className = "dot ok"; main.textContent = "Ready"; }
     const rows = [
       ["Files", `${s.documents} (${Object.entries(s.kinds).map(([k, v]) => `${v} ${k}`).join(", ") || "none"})`],
@@ -567,7 +827,7 @@ async function refreshStatus() {
     ];
     if (s.warmup_error) rows.push(["Error", s.warmup_error]);
     $("#status-grid").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
-    if (firstLoad && !current()?.messages.length) renderThread();
+    if (firstLoad && state.view.kind === "chat") { applyView(); if (!current()?.messages.length) renderThread(); }
   } catch (e) {
     $("#status-dot").className = "dot bad";
     $("#status-main").textContent = "Server not reachable";
@@ -621,9 +881,10 @@ function wire() {
     if (state.controller) return;
     const conv = current();
     if (!conv || conv.messages.length) newConversation();
-    saveState(); renderAll(); showTab("chats"); closePanels(); textarea.focus();
+    saveState(); navigate(""); showTab("chats"); closePanels(); textarea.focus();
   });
   $("#tab-chats").addEventListener("click", () => showTab("chats"));
+  $("#tab-party").addEventListener("click", () => showTab("party"));
   $("#tab-library").addEventListener("click", () => showTab("library"));
   $("#open-rail").addEventListener("click", () => { app.classList.add("rail-open"); $("#scrim").hidden = false; });
   $("#open-catalog").addEventListener("click", () => { app.classList.add("catalog-open"); $("#scrim").hidden = false; });
@@ -660,5 +921,7 @@ wire();
   const conv = current();
   if (conv) { const last = conv.messages.map((m) => m.role).lastIndexOf("assistant"); state.selected = last >= 0 ? last : null; }
 }
-renderAll();
+window.addEventListener("hashchange", route);
+route();
 refreshStatus();
+loadParty().then(() => { if (state.view.kind === "chat" && !current()?.messages.length) renderThread(); });

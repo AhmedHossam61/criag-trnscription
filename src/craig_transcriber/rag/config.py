@@ -10,6 +10,14 @@ from ..paths import CONFIG_DIR, INDEX_DIR, ROOT
 
 
 @dataclass
+class PartyConfig:
+    name: str = ""             # the players' party; shown in the UI and told to the LLM
+    tagline: str = "Lore of the party"
+    emblem: str = "assets/emblem"
+    roster: str = "config/party.toml"  # the characters: a page each, and who is who for the LLM  # image file; without an extension, .png .svg .webp .jpg are tried
+
+
+@dataclass
 class SourcesConfig:
     documents: str = "data/documents"
     transcripts: str = "data/transcripts"
@@ -97,6 +105,7 @@ class ServerConfig:
 
 @dataclass
 class RagConfig:
+    party: PartyConfig = field(default_factory=PartyConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
     chunking: ChunkingConfig = field(default_factory=ChunkingConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)

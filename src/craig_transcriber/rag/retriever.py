@@ -6,6 +6,7 @@ reciprocal rank fusion, then reordered by the cross-encoder reranker.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 
@@ -41,8 +42,9 @@ class Hit:
 
 class Retriever:
     def __init__(self, cfg: RetrievalConfig, index: Index, embedder: Embedder,
-                 reranker: Reranker | None):
+                 reranker: Reranker | None, expand: Callable[[str], str] | None = None):
         self.cfg = cfg
+        self.expand = expand      # extra words for the keyword search (other spellings of names)
         self.index = index
         self.embedder = embedder
         self.reranker = reranker
@@ -53,7 +55,7 @@ class Retriever:
         if query_vec is None:
             query_vec = self.embedder.encode([query], query=True)[0]
         dense = self.index.dense_top(query_vec, self.cfg.dense_k)
-        keyword = self.index.keyword.top(query, self.cfg.keyword_k)
+        keyword = self.index.keyword.top(self.expand(query) if self.expand else query, self.cfg.keyword_k)
 
         fused: dict[int, Hit] = {}
         for rank, (i, sim) in enumerate(dense, start=1):

@@ -10,11 +10,14 @@ and delete files in data/documents, so it is not meant to face a network.
     POST   /api/reindex           index new / changed files  {"rebuild": false}
     GET    /api/passages/{id}     one passage with its neighbours
     POST   /api/classify          {"question"} -> one-step or multi-step
+    GET    /api/party             the characters in config/party.toml
+    GET    /api/party/{id}        one character's page: sheet, sessions, mentions
     POST   /api/chat              {"question", "history", "mode"} -> server-sent events
 """
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import threading
@@ -23,7 +26,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -31,6 +34,7 @@ from ..rag.documents import DOCUMENT_TYPES
 from ..rag.engine import RagEngine
 
 STATIC = Path(__file__).with_name("static")
+EMBLEM_TYPES = (".png", ".svg", ".webp", ".jpg", ".jpeg")
 
 
 class ChatMessage(BaseModel):
@@ -59,6 +63,15 @@ def safe_name(name: str) -> str:
     return stem[:150]
 
 
+def find_emblem(configured: Path | None) -> Path | None:
+    """The emblem image, trying the usual extensions when none is given."""
+    if configured is None:
+        return None
+    candidates = [configured] if configured.suffix.lower() in EMBLEM_TYPES else \
+        [configured.with_name(configured.name + ext) for ext in EMBLEM_TYPES]
+    return next((p for p in candidates if p.is_file()), None)
+
+
 def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
     config = engine.config
     docs_dir = config.path(config.sources.documents)
@@ -77,17 +90,63 @@ def create_app(engine: RagEngine, *, warm_up: bool = True) -> FastAPI:
             threading.Thread(target=_warm, daemon=True).start()
         yield
 
-    app = FastAPI(title="Craig Transcriber archive", lifespan=lifespan)
+    party = config.party.name or "The party"
+    page = (STATIC / "index.html").read_text(encoding="utf-8")
+    page = (page.replace("{{party}}", html.escape(party))
+                .replace("{{tagline}}", html.escape(config.party.tagline)))
+    emblem = find_emblem(config.path(config.party.emblem))
+    if emblem:
+        # Swap the built-in sigil for the party's emblem, and use it as the tab icon.
+        start, end = page.index("<!--sigil-->"), page.index("<!--/sigil-->") + len("<!--/sigil-->")
+        page = (page[:start] + '<img class="sigil" src="/emblem" alt="">' + page[end:])
+        page = page.replace("<!--icon-->", '<link rel="icon" href="/emblem">')
+
+    app = FastAPI(title=f"{party} lore", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.get("/", include_in_schema=False)
     def index_page():
-        return FileResponse(STATIC / "index.html")
+        return HTMLResponse(page)
+
+    def _character(character_id: str):
+        try:
+            c = engine.party.get(character_id)
+        except ValueError as exc:     # a mistake in config/party.toml
+            raise HTTPException(422, str(exc)) from exc
+        if c is None:
+            raise HTTPException(404, f"no character '{character_id}' in the roster")
+        return c
+
+    @app.get("/api/party")
+    def party_list():
+        try:
+            characters = engine.party.characters
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"name": party, "roster": config.party.roster,
+                "characters": [engine.party.card(c) for c in characters]}
+
+    @app.get("/api/party/{character_id}")
+    def party_page(character_id: str):
+        return engine.party.page(_character(character_id), engine.index.passages)
+
+    @app.get("/api/party/{character_id}/portrait", include_in_schema=False)
+    def party_portrait(character_id: str):
+        path = engine.party.portrait(_character(character_id))
+        if path is None:
+            raise HTTPException(404, "no portrait")
+        return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
+    @app.get("/emblem", include_in_schema=False)
+    def emblem_file():
+        if not emblem:
+            raise HTTPException(404, "no emblem")
+        return FileResponse(emblem, headers={"Cache-Control": "no-cache"})
 
     @app.get("/api/status")
     def status():
         return engine.status() | {"warmup_error": state["warmup_error"],
-                                  "upload_types": sorted(DOCUMENT_TYPES)}
+                                  "upload_types": sorted(DOCUMENT_TYPES), "emblem": emblem is not None}
 
     @app.get("/api/documents")
     def documents():

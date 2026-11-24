@@ -8,6 +8,7 @@ Usage:
     scribe rag ask "What does Ritual Adept do?"
     scribe rag ask --mode multi "Compare the cult and the guardians"
     scribe rag search "celestial shards"   # retrieval only, no LLM call
+    scribe rag read data/documents/characters/Kael.pdf   # the text it gets from a file
     scribe rag classify "..."         # one-step or multi-step, and how sure
     scribe rag router-eval            # how well the router does on its examples
 """
@@ -96,6 +97,22 @@ def cmd_search(args) -> None:
     print_sources([h.as_source(n) for n, h in enumerate(hits, start=1)])
 
 
+def cmd_read(args) -> None:
+    from ..rag.documents import DOCUMENT_TYPES, SourceFile, read_sections
+    for path in args.files:
+        kind = "transcript" if path.name == "transcript.json" else DOCUMENT_TYPES.get(path.suffix.lower())
+        if not kind or not path.is_file():
+            print(f"{path}: not a file the archive reads ({', '.join(sorted(DOCUMENT_TYPES))})")
+            continue
+        sections = read_sections(SourceFile(str(path), path, kind, path.stem))
+        words = sum(len(s.text.split()) for s in sections)
+        print(f"=== {path}  ({len(sections)} sections, {words} words)")
+        for s in sections:
+            print(f"\n--- {' · '.join(x for x in (s.heading, s.location) if x) or '(section)'}")
+            print(s.text.strip() or "(no text: a scanned page needs OCR)")
+        print()
+
+
 def cmd_classify(args) -> None:
     engine = _engine(args, need_llm=False)
     route = engine.classify(" ".join(args.question))
@@ -138,6 +155,10 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("query", nargs="+")
     p.add_argument("-k", type=int, default=8)
     p.set_defaults(func=cmd_search)
+
+    p = sub.add_parser("read", help="print the text the archive gets from a file (no models)")
+    p.add_argument("files", nargs="+", type=Path)
+    p.set_defaults(func=cmd_read)
 
     p = sub.add_parser("classify", help="one-step or multi-step?")
     p.add_argument("question", nargs="+")

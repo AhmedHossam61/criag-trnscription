@@ -6,7 +6,7 @@
 
 # --- Party (player characters) ---
 Kael
-Vaylor
+Vaelor
 Arnok
 Thalion
 Dungeon Master

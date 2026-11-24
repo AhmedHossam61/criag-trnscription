@@ -198,7 +198,7 @@ Make a text file, e.g. `config\phone_names.txt`:
 ```
 SPEAKER_03 = Thalion        # rename by speaker id
 Speaker 6  = Guest          # or by the name currently shown
-Vaylor     = SKIP           # hide someone from the transcript
+Vaelor     = SKIP           # hide someone from the transcript
 ```
 
 Then run:
@@ -324,7 +324,9 @@ After correcting, run `scribe rag ingest` (or **Re-index** in the UI) so the arc
 
 A small RAG system over two kinds of files:
 
-- **Your documents** in `data\documents\`: rulebooks, campaign notes, character sheets, homebrew. PDF, Markdown, Word (`.docx`), text and HTML are read.
+- **Your documents** in `data\documents\`: rulebooks, campaign notes, character sheets, homebrew. PDF, Markdown, Word (`.docx`), text and HTML are read, in any subfolder. It starts with `lore\`, `characters\`, `sessions\` (hand-written recaps) and `rules\`; the folders are only for you to keep things tidy, and you can add more.
+
+The page is named after your party, set under `[party]` in `config\rag.toml` (`name = "VAKT"`). The LLM is told the name too, so "What has VAKT done so far?" is understood as a question about your group. Put the party's emblem at `assets\emblem.png` (or `.svg`, `.webp`, `.jpg`) and restart `scribe serve`: it replaces the built-in sigil in the header and becomes the browser-tab icon.
 - **Session transcripts** in `data\transcripts\*\transcript.json`, added automatically.
 
 ### D.1 How an answer is made
@@ -400,9 +402,31 @@ All in `config\rag.toml`:
 `scribe rag search "..."` is the quickest way to see how a change affects what is found.
 
 ### D.8 Good documents
+- **Character sheets:** fillable PDFs (the official 5e sheet, D&D Beyond exports) work; what was typed in the form fields is read too. Name each file after the character (`characters\Kael.pdf`), since answers cite the file name. `scribe rag read FILE` prints exactly what the archive gets from a file, without loading any models.
 - Text PDFs work; **scanned** PDFs (images of pages) have no text to read and come out empty. Run OCR on them first.
 - Markdown headings (`#`, `##`) and Word heading styles are kept, so answers can cite "Campaign notes > The Cult".
 - One topic per file is easier to manage than one giant file: deleting or updating it only touches its own passages.
+
+### D.9 The party's pages
+The **Party** tab in the site has a page for each character in `config\party.toml`: the four player characters, and a **Companions** page with a card for each companion. A page shows:
+- the portrait, name, title and who plays them;
+- their sheet (`sheet = "data/documents/characters/Kael.pdf"`), laid out for reading;
+- on the right, every session they're in: how much they spoke, and each line where someone else names them;
+- buttons that ask the archive about them.
+
+To fill in a character, edit their entry in `config\party.toml` (title, summary, sheet, aliases) and reload the page; no restart needed. Each character has a folder in `assets\` named after them (`assets\Kael\`, `assets\Hasaneen\`, ...): their page shows `portrait.png` from it (`.jpg` and `.webp` work too), or the first image in the folder. Other art can live there as well.
+
+**Aliases matter.** The transcripts write names in Arabic (كايل, حسنين) or misheard (رادش for Raddis). Every spelling in `aliases` is found on the page, and a question that uses one spelling also searches for the others. If a page says someone never comes up, look for how the transcripts spell them and add it.
+
+### D.10 Older or lower-quality transcripts
+- **Only the `transcript.txt` from an earlier run** (lines like `[00:00:06.299] Dungeon Master:`): import it, from wherever it is:
+  ```powershell
+  scribe import "C:\old\transcript.txt"
+  scribe import "C:\old\session5.txt" --id session-05 --date 2026-03-14   # no '# Recording' / '# Start time' header
+  ```
+  It becomes `data\transcripts\<recording id>\` with a `transcript.json`, so it counts as a real session (character pages included). Speaker names go through `config\speaker_map.txt`, so Discord names and the old "Vaylor" come out right. Times inside a turn are estimated; turn starts are exact. If the same recording was already transcribed properly, the import refuses, since that version is better.
+- **Folders from this tool** (with a `transcript.json` inside, e.g. an old `out-AqliOggnsXbo`): copy the folder into `data\transcripts\`, then re-index. They count like any other session, including on the character pages. If the old folder used the 0.45 s setting, refresh its speaker names and filters with `scribe craig --rewrite-outputs -o data\transcripts\FOLDER --min-gap 0.45`. If you still have the Craig zip, transcribing it again gives a much better transcript.
+- **Text or Word files from elsewhere**: put them in `data\documents\sessions\`, named so you can tell them apart (`Session 05 - 2026-03-14.txt`). Answers can cite them, and character pages list them under "In your documents", but the per-session speaking counts only come from `transcript.json` folders.
 
 ---
 
@@ -446,6 +470,7 @@ scribe phone --rewrite-outputs -o data\transcripts\phone-SESSION --speaker-map c
 scribe correct -o data\transcripts\SESSION_ID --audio "data\recordings\SESSION.zip"
 
 # Archive
+scribe import "OLD\transcript.txt"   # an old transcript as a session
 scribe rag ingest         # after adding documents or transcripts
 scribe serve              # chat UI on http://127.0.0.1:8000
 ```

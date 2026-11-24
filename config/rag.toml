@@ -2,6 +2,17 @@
 # Paths are relative to the project root. Every key is optional: a missing
 # key keeps the default shown here.
 
+[party]
+# Your party's name: the page's title, and the LLM knows questions about it are
+# about your group of players.
+name = "VAKT"
+tagline = "Lore of the party"
+# The party's emblem, shown in the page header and as the browser-tab icon.
+# Without an extension, emblem.png / .svg / .webp / .jpg is looked for.
+emblem = "assets/VAKT_Arcane_Heraldic_Crest.png"
+# The characters: a page for each in the site, and who is who for the LLM.
+roster = "config/party.toml"
+
 [sources]
 # Your files: rulebooks, campaign notes, character sheets, ...
 # .md .txt .pdf .docx .html are read; anything else is ignored.
