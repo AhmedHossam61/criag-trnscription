@@ -50,9 +50,11 @@ const state = {
   selected: null,     // index of the assistant message shown in the catalog
   controller: null,   // AbortController of the running answer
   status: null,
-  view: { kind: "chat" },   // chat | character (id) | companions; follows location.hash
+  view: { kind: "chat" },   // chat | character (id) | companions | comics | comic (id); follows location.hash
+  comics: null,             // from /api/comics
   party: null,              // /api/party
   partyError: null,
+  canEdit: false,     // may upload, delete and re-index (an admin, or no logins at all)
 };
 
 function loadState() {
@@ -257,7 +259,9 @@ function renderWelcome() {
       el("div", { class: "meet-row" },
         mains().map((c) => el("a", { href: `#${c.id}` }, avatar(c, "sm"), c.name)),
         companions().length ? el("a", { href: "#companions", class: "comp" },
-          el("span", { class: "avatar-stack" }, companions().slice(0, 3).map((c) => avatar(c, "xs"))), "Companions") : null)));
+          el("span", { class: "avatar-stack" }, companions().slice(0, 3).map((c) => avatar(c, "xs"))), "Companions") : null,
+        state.comics && state.comics.length ? el("a", { href: "#comics", class: "comp" },
+          el("img", { class: "avatar xs cover", src: state.comics[0].pages[0], alt: "", loading: "lazy" }), "Comics") : null)));
   }
   return box;
 }
@@ -396,6 +400,7 @@ function openConversation(id) {
 
 async function api(path, options = {}) {
   const res = await fetch(path, options);
+  if (res.status === 401) { location.assign("/login"); throw new Error("signed out"); }
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;
     try { const body = await res.json(); if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail); } catch (e) {}
@@ -407,6 +412,7 @@ async function api(path, options = {}) {
 async function streamChat(body, onEvent, signal) {
   const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
                                          body: JSON.stringify(body), signal });
+  if (res.status === 401) { location.assign("/login"); throw new Error("signed out"); }
   if (!res.ok) throw new Error(`The server refused the question (${res.status}).`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -519,8 +525,8 @@ async function loadDocuments() {
     const sessions = documents.filter((d) => d.kind === "transcript");
     groups.replaceChildren(
       el("div", { class: "doc-group" }, el("h3", { text: `Documents · ${files.length}` }),
-        files.length ? el("ul", { class: "doc-list" }, files.map((d) => docRow(d, true)))
-                     : el("p", { class: "muted small", text: "None yet. Add files above." })),
+        files.length ? el("ul", { class: "doc-list" }, files.map((d) => docRow(d, state.canEdit)))
+                     : el("p", { class: "muted small", text: state.canEdit ? "None yet. Add files above." : "None yet." })),
       el("div", { class: "doc-group" }, el("h3", { text: `Session transcripts · ${sessions.length}` }),
         sessions.length ? el("ul", { class: "doc-list" }, sessions.map((d) => docRow(d, false)))
                         : el("p", { class: "muted small", text: "Transcripts in data/transcripts are added on re-index." })));
@@ -596,6 +602,11 @@ function renderPartyList() {
       el("span", { class: "who-text" }, el("span", { class: "n", text: "Companions" }),
         el("span", { class: "s", text: companions().length ? plural(companions().length, "companion") : "none yet" })))));
   items.push(...companions().map((c) => row(c, "sub")));
+  const comics = state.comics || [];
+  items.push(el("li", { class: "party-sep" },
+    el("a", { class: "party-row" + (view.kind === "comics" || view.kind === "comic" ? " active" : ""), href: "#comics" },
+      el("span", { class: "who-text" }, el("span", { class: "n", text: "Comics" }),
+        el("span", { class: "s", text: comics.length ? plural(comics.length, "comic") : "none yet" })))));
   $("#party-list").replaceChildren(...items);
 }
 
@@ -770,27 +781,114 @@ function renderCompanions() {
   $("#appearances").replaceChildren(el("p", { class: "cards-empty", text: "Open a companion to see where they come up in the sessions." }));
 }
 
+/* ----------------------------------------------------------------- comics */
+
+async function loadComics() {
+  try { state.comics = (await api("/api/comics")).comics; state.comicsError = null; }
+  catch (e) { state.comics = []; state.comicsError = e.message; }
+  renderPartyList();
+  return state.comics;
+}
+
+// The comic's characters: their portrait and a link to their page when the roster knows them.
+function castChips(comic, linked = true) {
+  return comic.characters.map((who) => {
+    const c = who.id && state.party ? state.party.characters.find((ch) => ch.id === who.id) : null;
+    return c ? el(linked ? "a" : "span", { class: "cast", href: linked ? `#${c.id}` : null }, avatar(c, "xs"), c.name)
+             : el("span", { class: "cast", text: who.name });
+  });
+}
+
+function renderComics() {
+  $("#chat-title").textContent = "Comics";
+  document.title = `Comics · ${partyName()} Lore`;
+  const comics = state.comics || [];
+  const grid = el("div", { class: "comic-grid" }, comics.map((m) => el("a", { class: "comic-card", href: `#comics/${m.id}` },
+    el("img", { class: "comic-cover", src: m.pages[0], alt: "", loading: "lazy" }),
+    el("div", { class: "cc-body" },
+      el("h3", { text: m.title }),
+      el("div", { class: "cc-meta", text: [plural(m.pages.length, "page"), m.date].filter(Boolean).join(" · ") }),
+      m.summary ? el("p", { dir: "auto", text: m.summary }) : null,
+      m.characters.length ? el("div", { class: "cast-row" }, castChips(m, false)) : null))));
+  $("#profile").replaceChildren(el("div", { class: "profile-inner" },
+    el("header", { class: "page-head" },
+      el("div", { class: "eyebrow", text: partyName() }),
+      el("h2", { text: "Comics" }),
+      el("p", { class: "muted", text: "The party's adventures, drawn." })),
+    state.comicsError ? el("p", { class: "note error", text: state.comicsError }) : null,
+    comics.length ? grid : el("p", { class: "muted note",
+      text: "No comics yet. Put each comic's pages in a folder of its own, assets/comics/<title>/, named 01, 02, 03 … so they read in order." })));
+  $("#appearances").replaceChildren(el("p", { class: "cards-empty", text: "Open a comic to see its pages here." }));
+}
+
+function renderComic(id) {
+  const comics = state.comics || [];
+  const i = comics.findIndex((m) => m.id === id);
+  if (i < 0) {
+    $("#chat-title").textContent = "Comics";
+    $("#profile").replaceChildren(el("div", { class: "profile-inner" },
+      el("p", { class: "muted note", text: "That comic isn't in assets/comics any more." }),
+      el("a", { href: "#comics", text: "All comics" })));
+    $("#appearances").replaceChildren();
+    return;
+  }
+  const m = comics[i];
+  $("#chat-title").textContent = m.title;
+  document.title = `${m.title} · ${partyName()} Lore`;
+  const pages = m.pages.map((src, n) => el("figure", { class: "comic-page", id: `page-${n + 1}` },
+    el("a", { href: src, target: "_blank", rel: "noopener", title: "Open full size" },
+      el("img", { src, alt: `${m.title}, page ${n + 1}`, loading: n < 2 ? "eager" : "lazy" }))));
+  const step = (j, label) => (comics[j] ? el("a", { class: "btn", href: `#comics/${comics[j].id}` }, `${label} ${comics[j].title}`) : el("span"));
+  $("#profile").replaceChildren(el("div", { class: "profile-inner comic-reader" },
+    el("header", { class: "page-head" },
+      el("a", { class: "eyebrow", href: "#comics", text: "Comics" }),
+      el("h2", { text: m.title }),
+      m.summary ? el("p", { class: "summary", dir: "auto", text: m.summary }) : null,
+      m.characters.length ? el("div", { class: "cast-row" }, castChips(m)) : null),
+    el("div", { class: "comic-pages" }, pages),
+    el("nav", { class: "comic-nav" }, step(i - 1, "←"), step(i + 1, "→"))));
+  $("#appearances").replaceChildren(
+    el("div", { class: "app-group" },
+      el("h3", { text: plural(m.pages.length, "page") }),
+      el("div", { class: "comic-thumbs" }, m.pages.map((src, n) => el("button", {
+        class: "comic-thumb", type: "button", "aria-label": `Page ${n + 1}`,
+        onclick: () => { closePanels(); $(`#page-${n + 1}`).scrollIntoView({ behavior: "smooth", block: "start" }); } },
+        el("img", { src, alt: "", loading: "lazy" }), el("span", { text: n + 1 }))))),
+    m.characters.length ? el("div", { class: "app-group" }, el("h3", { text: "In this comic" }),
+      el("div", { class: "cast-col" }, castChips(m))) : null);
+}
+
 /* ---------------------------------------------------------------- routing */
 
-// The address bar holds the page: "" is the chat, #companions, or #<character>.
+// The address bar holds the page: "" is the chat, #companions, #comics, #comics/<id>, or #<character>.
 function applyView() {
   const chat = state.view.kind === "chat";
   $("#thread").hidden = !chat; $("#composer").hidden = !chat; $("#profile").hidden = chat;
   $("#trace").hidden = !chat; $("#cards").hidden = !chat; $("#appearances").hidden = chat;
-  $("#catalog-title").textContent = chat ? "Sources" : "In the sessions";
+  const comic = state.view.kind === "comics" || state.view.kind === "comic";
+  $("#catalog-title").textContent = chat ? "Sources" : comic ? "Pages" : "In the sessions";
   $("#open-catalog").setAttribute("aria-label", chat ? "Show sources" : "Show where they come up");
   if (chat) document.title = `${partyName() === "the party" ? "" : partyName() + " "}Lore`.trim();
 }
 
 async function route() {
   const hash = decodeURIComponent(location.hash.slice(1));
-  state.view = !hash ? { kind: "chat" } : hash === "companions" ? { kind: "companions" } : { kind: "character", id: hash };
+  state.view = !hash ? { kind: "chat" }
+    : hash === "companions" ? { kind: "companions" }
+    : hash === "comics" ? { kind: "comics" }
+    : hash.startsWith("comics/") ? { kind: "comic", id: hash.slice(7) }
+    : { kind: "character", id: hash };
   applyView();
   closePanels();
   if (state.view.kind === "chat") { renderAll(); renderPartyList(); return; }
   showTab("party");
   $("#profile").scrollTop = 0;
   await loadParty();
+  if (state.view.kind === "comics" || state.view.kind === "comic") {
+    await loadComics();
+    if (state.view.kind === "comics") renderComics(); else renderComic(state.view.id);
+    return;
+  }
   if (state.view.kind === "companions") renderCompanions();
   else if (state.view.kind === "character") await renderProfile(state.view.id);
 }
@@ -811,6 +909,14 @@ async function refreshStatus() {
     const s = await api("/api/status");
     const firstLoad = !state.status;
     state.status = s;
+    const canEdit = !s.login || Boolean(s.user && s.user.admin);
+    if (canEdit !== state.canEdit) {
+      state.canEdit = canEdit;
+      document.body.classList.toggle("read-only", !canEdit);
+      if (!$("#panel-library").hidden) loadDocuments();
+    }
+    $("#account").hidden = !s.user;
+    if (s.user) $("#account-name").textContent = `Signed in as ${s.user.name}${s.user.admin ? " · admin" : ""}`;
     const dot = $("#status-dot"), main = $("#status-main");
     if (s.warmup_error) { dot.className = "dot bad"; main.textContent = "Models failed to load"; }
     else if (s.ingesting) { dot.className = "dot busy"; main.textContent = "Indexing…"; busy = true; }
@@ -924,4 +1030,4 @@ wire();
 window.addEventListener("hashchange", route);
 route();
 refreshStatus();
-loadParty().then(() => { if (state.view.kind === "chat" && !current()?.messages.length) renderThread(); });
+Promise.all([loadParty(), loadComics()]).then(() => { if (state.view.kind === "chat" && !current()?.messages.length) renderThread(); });

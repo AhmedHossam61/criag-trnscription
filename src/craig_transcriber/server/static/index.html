@@ -14,7 +14,7 @@
   try { const t = localStorage.getItem("lorekeeper.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 </head>
-<body>
+<body class="read-only">
 <div class="app" id="app">
 
   <aside class="rail" id="rail" aria-label="Conversations and library">
@@ -64,6 +64,10 @@
     <footer class="status" id="status" aria-live="polite">
       <div class="status-line"><span class="dot" id="status-dot"></span><span id="status-main">Connecting…</span></div>
       <dl class="status-grid" id="status-grid"></dl>
+      <div class="account" id="account" hidden>
+        <span id="account-name"></span>
+        <form method="post" action="/logout"><button class="link-btn" type="submit">Sign out</button></form>
+      </div>
     </footer>
   </aside>
 

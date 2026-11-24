@@ -11,4 +11,8 @@ Hasaneen, Ronaldo Raddis the Third; a nickname like "Raddis" works too):
                     .png .jpg .webp all work; square-ish images crop best.
     anything else   free to keep here (more art, maps, tokens).
 
+comics/ -- one folder per comic, named after it (comics/Two Minutes/):
+    01.jpeg, 02.jpeg, ...   its pages, read in number order (2 before 10)
+    comic.toml              optional: title, summary, date, characters
+
 Changes show on the next page reload; no restart needed.

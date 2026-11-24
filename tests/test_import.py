@@ -72,6 +72,8 @@ def test_import_writes_a_session_and_protects_real_ones(tmp_path, capsys):
 
     with pytest.raises(SystemExit):                       # exists: needs --force
         main([str(src), "--output-root", str(out)])
+    main([str(session / "original-old.txt"), "--output-root", str(out), "--force"])   # its own original
+    assert sorted(p.name for p in session.iterdir()) == ["original-old.txt", "recording.json", "transcript.json"]
     (session / "segments.jsonl").write_text("{}", encoding="utf-8")
     with pytest.raises(SystemExit):                       # a real transcription is never replaced
         main([str(src), "--output-root", str(out), "--force"])

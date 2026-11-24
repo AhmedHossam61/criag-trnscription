@@ -12,6 +12,9 @@ tagline = "Lore of the party"
 emblem = "assets/VAKT_Arcane_Heraldic_Crest.png"
 # The characters: a page for each in the site, and who is who for the LLM.
 roster = "config/party.toml"
+# The party's comics: a folder per comic (assets/comics/<title>/01.png, 02.png, ...),
+# with an optional comic.toml for its title, summary, date and characters.
+comics = "assets/comics"
 
 [sources]
 # Your files: rulebooks, campaign notes, character sheets, ...
@@ -74,8 +77,12 @@ temperature = 0.2
 history_turns = 3          # earlier questions and answers shown to the model
 
 [llm.gemini]
-model = "gemini-2.5-flash"
-daily_limit = 20           # calls per key per day (free tier); shared with scribe correct
+# Flash-Lite: the free tier allows far more calls a day than Flash (reported
+# ~500 vs ~20, per Google Cloud project, not per key), which a whole party
+# asking questions needs. "-latest" follows Google's current Flash-Lite.
+# scribe correct keeps its own model and its own count.
+model = "gemini-flash-lite-latest"
+daily_limit = 500          # calls per key per day; see your real limit at aistudio.google.com/rate-limit
 # thinking_budget = 0      # uncomment to switch off thinking on 2.5 models: faster answers
 
 [llm.ollama]
@@ -87,3 +94,8 @@ url = "http://localhost:11434"
 host = "127.0.0.1"
 port = 8000
 max_upload_mb = 50
+# Who can sign in (scribe users add NAME). With nobody in it the site is open,
+# which is fine on this computer only: it refuses requests that come through a
+# tunnel until a login exists.
+users = "config/users.toml"
+session_days = 30          # how long a login lasts before signing in again

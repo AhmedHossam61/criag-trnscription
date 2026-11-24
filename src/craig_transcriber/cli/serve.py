@@ -4,6 +4,9 @@
 Usage:
     scribe serve                      # http://127.0.0.1:8000
     scribe serve --port 8080 --no-rerank
+
+To share it with the party: add logins (scribe users add), then
+`tailscale funnel --bg 8000` (see docs/GUIDE.md, "Sharing the site").
 """
 
 from __future__ import annotations
@@ -34,5 +37,16 @@ def main(argv: list[str] | None = None) -> None:
     app = create_app(engine, warm_up=not args.no_warmup)
     host = args.host or config.server.host
     port = args.port or config.server.port
+    from ..server.auth import load_users
+    try:
+        users = load_users(config.path(config.server.users))
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc
     print(f"Archive UI on http://{host}:{port}  (Ctrl+C to stop)")
+    if users:
+        admins = sum(u.admin for u in users.values())
+        print(f"Logins on: {len(users)} user(s), {admins} admin(s).")
+    else:
+        print("Logins off: open on this computer, refused through a tunnel. "
+              "Before sharing: scribe users add NAME --admin")
     uvicorn.run(app, host=host, port=port, log_level="warning")

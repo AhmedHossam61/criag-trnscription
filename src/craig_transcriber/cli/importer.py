@@ -156,7 +156,8 @@ def import_file(path: Path, args, speaker_map: dict[str, str]) -> bool:
     # data/documents moves out of there, or it would be indexed twice.
     original = out / f"original-{path.name}"
     moved = path.resolve().is_relative_to(DOCUMENTS_DIR.resolve())
-    if path.resolve() != original.resolve():
+    # Re-importing the original kept in the folder (--force) leaves it where it is.
+    if path.resolve().parent != out.resolve():
         (shutil.move if moved else shutil.copyfile)(path, original)
 
     speakers: dict[str, int] = {}

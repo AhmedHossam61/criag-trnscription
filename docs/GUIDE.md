@@ -377,7 +377,7 @@ Set in `config\rag.toml` under `[llm]`. Providers are tried in order:
 providers = ["gemini", "ollama"]
 ```
 
-- **Gemini** uses the keys in `.env`. Free tier: about 20 calls per key per model per day, shared with `scribe correct`. A one-step question costs **1 call**; a multi-step question costs **2–3** (plan, maybe one follow-up, answer). To save calls, set `max_hops = 1` under `[multistep]`, or point `[llm.gemini] model` at a model with a bigger free quota (`scribe correct --list-models` lists them).
+- **Gemini** uses the keys in `.env`. Answers use **Flash-Lite** (`gemini-flash-lite-latest`): its free tier allows far more calls a day than Flash (reported around 500 against 20), which a whole party asking questions needs. `scribe correct` keeps its own model and its own count. The limit is **per Google Cloud project, not per key**, so a second key only helps if it was made in a different project. Your real numbers are at https://aistudio.google.com/rate-limit; set `daily_limit` to match. A one-step question costs **1 call**; a multi-step question costs **2–3** (plan, maybe one follow-up, answer). To save calls, set `max_hops = 1` under `[multistep]`. `scribe correct --list-models` lists the models your key can use. On the free tier, Google may use what is sent to improve its products.
 - **Ollama** runs a model on your own GPU: no limit, nothing leaves the computer. Install from https://ollama.com, then:
   ```powershell
   ollama pull qwen3:4b
@@ -416,6 +416,8 @@ The **Party** tab in the site has a page for each character in `config\party.tom
 
 To fill in a character, edit their entry in `config\party.toml` (title, summary, sheet, aliases) and reload the page; no restart needed. Each character has a folder in `assets\` named after them (`assets\Kael\`, `assets\Hasaneen\`, ...): their page shows `portrait.png` from it (`.jpg` and `.webp` work too), or the first image in the folder. Other art can live there as well.
 
+**Comics.** The Party tab ends with **Comics**: a cover for each comic, and a reader with the pages one under another. Each comic is a folder in `assets\comics\` (`assets\comics\Two Minutes\`). Name the pages so they sort in reading order: `01.jpeg`, `02.jpeg`, ... (WhatsApp names don't). An optional `comic.toml` next to them sets the title, a summary, the date and who is in it (`characters = ["Kael", "Arnok"]`, which link to their pages). A new folder shows up on the next page reload.
+
 **Aliases matter.** The transcripts write names in Arabic (كايل, حسنين) or misheard (رادش for Raddis). Every spelling in `aliases` is found on the page, and a question that uses one spelling also searches for the others. If a page says someone never comes up, look for how the transcripts spell them and add it.
 
 ### D.10 Older or lower-quality transcripts
@@ -427,6 +429,42 @@ To fill in a character, edit their entry in `config\party.toml` (title, summary,
   It becomes `data\transcripts\<recording id>\` with a `transcript.json`, so it counts as a real session (character pages included). Speaker names go through `config\speaker_map.txt`, so Discord names and the old "Vaylor" come out right. Times inside a turn are estimated; turn starts are exact. If the same recording was already transcribed properly, the import refuses, since that version is better.
 - **Folders from this tool** (with a `transcript.json` inside, e.g. an old `out-AqliOggnsXbo`): copy the folder into `data\transcripts\`, then re-index. They count like any other session, including on the character pages. If the old folder used the 0.45 s setting, refresh its speaker names and filters with `scribe craig --rewrite-outputs -o data\transcripts\FOLDER --min-gap 0.45`. If you still have the Craig zip, transcribing it again gives a much better transcript.
 - **Text or Word files from elsewhere**: put them in `data\documents\sessions\`, named so you can tell them apart (`Session 05 - 2026-03-14.txt`). Answers can cite them, and character pages list them under "In your documents", but the per-session speaking counts only come from `transcript.json` folders.
+
+### D.11 Sharing the site with the party
+The site runs on your PC and Tailscale Funnel gives it a fixed `https://….ts.net` address. It's free, with no domain and no router settings. The party just opens the link and signs in. Your PC has to be on while they use it.
+
+**1. Logins (once).** Without any, the site refuses everything that comes through the tunnel.
+```powershell
+scribe users add Ahmed --admin     # you: can upload, delete and re-index
+scribe users add Seif              # members: read, browse the party, ask questions
+scribe users add Hazem
+scribe users add Abdo
+scribe users list
+```
+Each asks for a password (8 characters or more), stored only as a hash in `config\users.toml` (not committed). `scribe users passwd NAME` sets a new one and signs that person out everywhere; `scribe users remove NAME` takes a login away. A running server picks up changes at once.
+
+**2. Tailscale (once).** Install it from https://tailscale.com/download and sign in (the free Personal plan is enough). Then, in PowerShell (an Administrator one if it says access is denied):
+```powershell
+tailscale funnel --bg 8000
+```
+The first time, it prints a link to switch on HTTPS and Funnel for your account; open it, approve, and run the command again. It prints your address, e.g. `https://desktop-abc.tail1234.ts.net`. That address stays the same, and `--bg` keeps it on after restarts. Send it to the party.
+
+**3. Each time you want the site up:**
+```powershell
+scribe serve
+```
+`tailscale funnel status` shows whether it is public; `tailscale funnel reset` takes it down.
+
+**After a new session:** transcribe and correct as usual, then press **Re-index** in the site's Library tab (signed in as admin). Re-indexing from the site uses the models the server already has loaded; `scribe rag ingest` in a second terminal would load a second copy, and the server keeps answering from the old index until it restarts.
+
+**What a member sees:** the chat, the Party pages and the list of files. Uploading, deleting and Re-index are admin only, in the page and in the API. Conversations stay in each person's own browser.
+
+**Good to know:**
+- Every question uses your Gemini quota. If it runs out, answers come from Ollama on your GPU (D.5), or the site shows the sources without an answer.
+- Funnel addresses are public names: anyone can reach the sign-in page, so use real passwords. Eight wrong passwords for a name lock it for 15 minutes.
+- Transcribing on the GPU while the site is up is slow (see Troubleshooting). Stop `scribe serve` for long transcriptions.
+
+To keep the site up while your PC is off, see the free-hosting plan in `docs\HOSTING-PLAN.md` (Option B).
 
 ---
 
@@ -448,6 +486,10 @@ To fill in a character, edit their entry in `config\party.toml` (title, summary,
 | UI says "The archive is empty" | Add files to `data\documents\` and press **Re-index** (or `scribe rag ingest`). |
 | A PDF gives 0 passages | It's scanned; see D.8. |
 | Answers miss something you know is there | `scribe rag search "..."` to see what retrieval finds. Try the other mode (One-step / Multi-step), or name the thing exactly as it's written. |
+| Friends get "This site has no logins yet" | Add logins (D.11, step 1). The site refuses tunnel traffic until there is one. |
+| The site keeps sending you back to "Sign in" | The login expired (`session_days` in `rag.toml`), the password was changed, or cookies are blocked for the site. |
+| Locked out after wrong passwords | Wait 15 minutes, or reset it: `scribe users passwd NAME`. |
+| The ts.net address doesn't load | `scribe serve` isn't running, the PC is asleep, or Funnel is off (`tailscale funnel status`). |
 | Transcribing while `scribe serve` runs is slow | The archive's models use about 2.5 GB of VRAM. Stop the server while transcribing. |
 
 ---
@@ -473,4 +515,8 @@ scribe correct -o data\transcripts\SESSION_ID --audio "data\recordings\SESSION.z
 scribe import "OLD\transcript.txt"   # an old transcript as a session
 scribe rag ingest         # after adding documents or transcripts
 scribe serve              # chat UI on http://127.0.0.1:8000
+
+# Sharing it (D.11)
+scribe users add NAME [--admin]   # passwd NAME / remove NAME / list
+tailscale funnel --bg 8000        # once; tailscale funnel reset turns it off
 ```

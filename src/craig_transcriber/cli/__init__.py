@@ -7,6 +7,7 @@
     scribe import    add an old transcript.txt as a session
     scribe rag       build the document index and ask questions from the terminal
     scribe serve     start the chat UI at http://127.0.0.1:8000
+    scribe users     who can sign in to the site (needed before sharing it)
 
 `scribe <command> --help` shows each command's options.
 """
@@ -23,6 +24,7 @@ COMMANDS = {
     "import": "craig_transcriber.cli.importer",
     "rag": "craig_transcriber.cli.rag",
     "serve": "craig_transcriber.cli.serve",
+    "users": "craig_transcriber.cli.users",
 }
 
 

@@ -1,0 +1,7 @@
+# Everything here is optional. Pages are read in name order: 01, 02, ... 10.
+title = "Two Minutes"
+summary = """On the walls above the camp at dusk, Kael tells the others to wait two minutes. \
+Arnok offers Vaelor something to take him somewhere else. It isn't even lit. \
+Then the sky starts falling."""
+# date = "2026-11-24"
+characters = ["Kael", "Arnok", "Vaelor"]

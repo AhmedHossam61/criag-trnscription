@@ -227,3 +227,6 @@ data/voices.npz
 data/index/
 # Gemini calls per key per day (fingerprints only, no keys)
 data/.gemini_usage.json
+# Logins for the lore site (password hashes) and the key that signs sign-in cookies
+config/users.toml
+data/.session_secret

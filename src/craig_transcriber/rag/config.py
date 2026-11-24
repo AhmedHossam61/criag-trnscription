@@ -14,7 +14,8 @@ class PartyConfig:
     name: str = ""             # the players' party; shown in the UI and told to the LLM
     tagline: str = "Lore of the party"
     emblem: str = "assets/emblem"
-    roster: str = "config/party.toml"  # the characters: a page each, and who is who for the LLM  # image file; without an extension, .png .svg .webp .jpg are tried
+    roster: str = "config/party.toml"  # the characters: a page each, and who is who for the LLM
+    comics: str = "assets/comics"      # a folder per comic, pages in name order
 
 
 @dataclass
@@ -101,6 +102,8 @@ class ServerConfig:
     host: str = "127.0.0.1"
     port: int = 8000
     max_upload_mb: int = 50
+    users: str = "config/users.toml"   # logins; none -> the site is open (this computer only)
+    session_days: int = 30             # how long a login lasts
 
 
 @dataclass

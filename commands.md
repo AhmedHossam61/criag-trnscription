@@ -71,6 +71,31 @@ scribe serve
 Open http://127.0.0.1:8000 and leave the terminal open (Ctrl+C stops it).
 Character pages: http://127.0.0.1:8000/#kael, `#vaelor`, `#thalion`, `#arnok`, `#companions`.
 
+## 7. Share it with the party (Option A: your PC + Tailscale Funnel)
+
+Logins first; each command asks for that person's password (8+ characters):
+
+```powershell
+scribe users add Ahmed --admin
+scribe users add Seif
+scribe users add Hazem
+scribe users add Abdo
+```
+
+Install Tailscale from https://tailscale.com/download and sign in. Then once (if it says access is denied, use an Administrator PowerShell):
+
+```powershell
+tailscale funnel --bg 8000
+```
+
+The first time it prints a link to switch Funnel on: open it, approve, run the command again. It prints the address to send to the party (`https://<your-pc>.<tailnet>.ts.net`). From then on only `scribe serve` is needed; the address stays the same.
+
+Check which Flash-Lite model your key has (the site now answers with `gemini-flash-lite-latest`):
+
+```powershell
+scribe correct --list-models
+```
+
 ---
 
 ## Later
@@ -88,10 +113,20 @@ ollama pull qwen3:4b
 ```powershell
 scribe craig "data\recordings\NEW-SESSION.zip"
 scribe correct -o data\transcripts\SESSION_ID --audio "data\recordings\NEW-SESSION.zip"
-scribe rag ingest
+scribe serve        # then Library > Re-index, signed in as admin
 ```
 
-Stop `scribe serve` while transcribing: both use the GPU.
+Stop `scribe serve` while transcribing: both use the GPU. Re-index from the site rather than `scribe rag ingest` while the server runs: the server only sees a new index after a re-index from the site or a restart.
+
+### Logins
+
+```powershell
+scribe users list
+scribe users passwd Seif      # new password, signs him out everywhere
+scribe users remove Seif
+tailscale funnel status       # is the site public?
+tailscale funnel reset        # take it offline
+```
 
 ### After adding or changing documents, PDFs or config\party.toml
 
@@ -100,7 +135,8 @@ scribe rag ingest            # documents and PDFs (or Re-index in the site)
 ```
 
 `config\party.toml` (titles, summaries, aliases, sheets) needs no command: reload the page.
-Portraits go in each character's folder as `portrait.png`: `assets\Vaelor\`, `assets\Thalion\`, `assets\Arnok\`, `assets\Ronaldo Raddis the Third\` (Kael and Hasaneen are done).
+Comics go in `assets\comics\<title>\` as `01.jpeg`, `02.jpeg`, ..., with an optional `comic.toml` (see `assets\comics\Two Minutes\`).
+Portraits go in each character's folder as `portrait.png` / `.jpg` (not in `data\documents`). Every character has one now; a file named `portrait` is the one shown.
 
 ### Checks
 
